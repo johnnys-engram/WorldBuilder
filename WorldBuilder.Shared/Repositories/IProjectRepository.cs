@@ -192,5 +192,11 @@ namespace WorldBuilder.Shared.Repositories {
         /// <param name="ct">The cancellation token.</param>
         /// <returns>A task representing the result of the operation.</returns>
         Task<Result<Unit>> SetKeyValueAsync(string key, string? value, ITransaction? tx, CancellationToken ct);
+
+        /// <summary>Reads a serialized project document blob (e.g. portal_tables overlay).</summary>
+        Task<Result<byte[]>> GetProjectDocumentBlobAsync(string id, ITransaction? tx, CancellationToken ct);
+
+        /// <summary>Persists a project document blob.</summary>
+        Task<Result<Unit>> UpsertProjectDocumentAsync(string id, byte[] data, ulong version, ITransaction? tx, CancellationToken ct);
     }
 }

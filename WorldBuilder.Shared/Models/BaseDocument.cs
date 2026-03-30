@@ -11,6 +11,7 @@ namespace WorldBuilder.Shared.Models;
 /// </summary>
 [MemoryPackable]
 [MemoryPackUnion(0, typeof(TerrainPatchDocument))]
+[MemoryPackUnion(1, typeof(PortalDatDocument))]
 public abstract partial class BaseDocument : IDisposable {
     /// <summary>The unique identifier for the document.</summary>
     [MemoryPackOrder(0)]

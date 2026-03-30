@@ -154,9 +154,23 @@ namespace WorldBuilder.Shared.Services {
                         }
                     });
 
+                    progress?.Report(new DatExportProgress("Writing portal table overrides...", 0.92f));
+                    var portalRentResult =
+                        await _documentManager.RentDocumentAsync<PortalDatDocument>(PortalDatDocument.DocumentId, null,
+                            CancellationToken.None);
+                    if (portalRentResult.IsSuccess) {
+                        try {
+                            await portalRentResult.Value.Document.SaveToDatsAsync(exportDatWriter, portalIteration,
+                                cellIteration, null);
+                        }
+                        finally {
+                            portalRentResult.Value.Dispose();
+                        }
+                    }
+
                     if (projectRegions.Count == 0 && totalAffectedLandblocks == 0) {
-                        _log.LogInformation("No modified regions found to export.");
-                        progress?.Report(new DatExportProgress("No modified regions found.", 1.0f));
+                        _log.LogInformation("No modified regions found for terrain export.");
+                        progress?.Report(new DatExportProgress("Terrain: no modified regions; portal overrides written if any.", 0.96f));
                     }
                 }
 

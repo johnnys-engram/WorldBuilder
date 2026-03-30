@@ -105,6 +105,14 @@ public partial class DocumentManager : IDocumentManager, IDisposable {
             else if (document is LandscapeDocument) {
                 _logger.LogTrace("Virtual LandscapeDocument with ID {DocumentId} added to system", document.Id);
             }
+            else if (document is PortalDatDocument pd) {
+                var blob = pd.Serialize();
+                var insertResult = await _repo.UpsertProjectDocumentAsync(document.Id, blob, document.Version, tx, ct);
+                if (insertResult.IsFailure) {
+                    return Result<DocumentRental<T>>.Failure(insertResult.Error);
+                }
+                _logger.LogTrace("Portal DAT document {DocumentId} inserted into database", document.Id);
+            }
             else {
                 return Result<DocumentRental<T>>.Failure($"Document type {typeof(T).Name} is not supported for generic persistence", "UNSUPPORTED_TYPE");
             }
@@ -158,6 +166,9 @@ public partial class DocumentManager : IDocumentManager, IDisposable {
             }
             else if (typeof(T) == typeof(TerrainPatchDocument)) {
                 newDoc = await LoadDocumentAsync<T>(id, tx, ct);
+            }
+            else if (typeof(T) == typeof(PortalDatDocument) && id == PortalDatDocument.DocumentId) {
+                newDoc = await LoadOrCreatePortalDatDocumentAsync<T>(tx, ct);
             }
 
             if (newDoc == null) {
@@ -218,6 +229,14 @@ public partial class DocumentManager : IDocumentManager, IDisposable {
         }
         else if (doc is LandscapeDocument) {
             _logger.LogTrace("LandscapeDocument {DocumentId} persist requested, skipping blob storage", doc.Id);
+        }
+        else if (doc is PortalDatDocument) {
+            _logger.LogTrace("Persisting portal DAT overlay document {DocumentId}", doc.Id);
+            var blob = doc.Serialize();
+            var updateResult = await _repo.UpsertProjectDocumentAsync(doc.Id, blob, doc.Version, tx, ct);
+            if (updateResult.IsFailure) {
+                return Result<Unit>.Failure(updateResult.Error);
+            }
         }
         else {
             return Result<Unit>.Failure($"Document type {typeof(T).Name} is not supported for generic persistence", "UNSUPPORTED_TYPE");
@@ -376,6 +395,22 @@ public partial class DocumentManager : IDocumentManager, IDisposable {
             return BaseDocument.Deserialize<T>(blobResult.Value);
         }
 
+        return null;
+    }
+
+    private async Task<T?> LoadOrCreatePortalDatDocumentAsync<T>(ITransaction? tx, CancellationToken ct) where T : BaseDocument {
+        var blobResult = await _repo.GetProjectDocumentBlobAsync(PortalDatDocument.DocumentId, tx, ct);
+        if (blobResult.IsSuccess) {
+            var deserialized = BaseDocument.Deserialize<PortalDatDocument>(blobResult.Value);
+            return deserialized as T;
+        }
+
+        if (blobResult.Error.Code == "NOT_FOUND_ERROR") {
+            _logger.LogTrace("Creating new empty PortalDatDocument");
+            return new PortalDatDocument() as T;
+        }
+
+        _logger.LogError("Failed to load PortalDatDocument: {Error}", blobResult.Error.Message);
         return null;
     }
 

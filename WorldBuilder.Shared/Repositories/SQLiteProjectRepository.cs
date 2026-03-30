@@ -570,6 +570,29 @@ namespace WorldBuilder.Shared.Repositories {
             }, ct);
         }
 
+        public async Task<Result<byte[]>> GetProjectDocumentBlobAsync(string id, ITransaction? tx, CancellationToken ct) {
+            return await ExecuteAsync(tx, async (connection, sqliteTx) => {
+                using var cmd = new SqliteCommand("SELECT Data FROM ProjectDocuments WHERE Id = @id", connection, sqliteTx);
+                cmd.Parameters.AddWithValue("@id", id);
+                var result = await cmd.ExecuteScalarAsync(ct);
+                return (result == null || result == DBNull.Value)
+                    ? Result<byte[]>.Failure(Error.NotFound("Project document not found"))
+                    : Result<byte[]>.Success((byte[])result);
+            }, ct);
+        }
+
+        public async Task<Result<Unit>> UpsertProjectDocumentAsync(string id, byte[] data, ulong version, ITransaction? tx, CancellationToken ct) {
+            return await ExecuteAsync(tx, async (connection, sqliteTx) => {
+                var sql = "INSERT INTO ProjectDocuments (Id, Data, Version) VALUES (@id, @data, @version) ON CONFLICT(Id) DO UPDATE SET Data = @data, Version = @version";
+                using var cmd = new SqliteCommand(sql, connection, sqliteTx);
+                cmd.Parameters.AddWithValue("@id", id);
+                cmd.Parameters.AddWithValue("@data", data);
+                cmd.Parameters.AddWithValue("@version", (long)version);
+                await cmd.ExecuteNonQueryAsync(ct);
+                return Result<Unit>.Success(Unit.Value);
+            }, ct);
+        }
+
         public void Dispose() {
             if (_disposed) return;
             _disposed = true;

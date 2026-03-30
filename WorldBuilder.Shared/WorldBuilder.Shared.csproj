@@ -18,6 +18,7 @@
 		<PackageReference Include="FluentMigrator.Runner.Core" />
 		<PackageReference Include="FluentMigrator.Runner.SQLite" />
 		<PackageReference Include="MemoryPack" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
 		<PackageReference Include="Microsoft.AspNetCore.SignalR.Common" />
 		<PackageReference Include="Microsoft.AspNetCore.SignalR.Core" />
 		<PackageReference Include="Microsoft.Data.Sqlite.Core" />
