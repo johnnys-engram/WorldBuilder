@@ -162,6 +162,11 @@
                     <Button Classes="toolbar-btn" Content="+ New Spell" Command="{Binding AddSpellCommand}" IsEnabled="{Binding IsSpellEditingEnabled}" />
                     <Button Classes="toolbar-btn" Content="Delete Spell" Command="{Binding DeleteSpellCommand}" Foreground="#c45858" IsEnabled="{Binding IsSpellEditingEnabled}" />
                     <Border Width="1" Background="#2a1d42" Margin="4,2" />
+                    <Button Classes="toolbar-btn" Content="Export JSON…" Command="{Binding ExportSpellsCommand}" />
+                    <Button Classes="toolbar-btn" Content="Export CSV…" Command="{Binding ExportSpellsCsvCommand}" />
+                    <Button Classes="toolbar-btn" Content="Import JSON…" Command="{Binding ImportSpellsCommand}" IsEnabled="{Binding IsSpellEditingEnabled}" />
+                    <Button Classes="toolbar-btn" Content="Import CSV…" Command="{Binding ImportSpellsCsvCommand}" IsEnabled="{Binding IsSpellEditingEnabled}" />
+                    <Border Width="1" Background="#2a1d42" Margin="4,2" />
                     <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" FontSize="12" Foreground="#ddd4f0" />
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Spacing="8" DockPanel.Dock="Right" HorizontalAlignment="Right">

@@ -1,12 +1,18 @@
 using Avalonia.Media.Imaging;
+using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DatReaderWriter.DBObjs;
+using HanumanInstitute.MvvmDialogs;
+using HanumanInstitute.MvvmDialogs.FrameworkDialogs;
 using DatReaderWriter.Enums;
 using DatReaderWriter.Types;
 using System.Collections.ObjectModel;
+using System.IO;
+using System.Text.Json;
 using SpellItemType = DatReaderWriter.Enums.ItemType;
+using SpellRow = DatReaderWriter.Types.SpellBase;
 using WorldBuilder.Lib;
 using WorldBuilder.Services;
 using WorldBuilder.Shared.Models;
@@ -19,10 +25,11 @@ public partial class SpellEditorViewModel : ViewModelBase {
     private readonly Project _project;
     private readonly IDocumentManager _documentManager;
     private readonly IDatReaderWriter _dats;
+    private readonly IDialogService _dialogService;
     private DocumentRental<PortalDatDocument>? _portalRental;
     private PortalDatDocument? _portalDoc;
     private SpellTable? _spellTable;
-    private Dictionary<uint, SpellBase>? _allSpells;
+    private Dictionary<uint, SpellRow>? _allSpells;
     private SpellComponentTable? _componentTable;
     private bool _initialized;
     private const uint SpellTableId = 0x0E00000E;
@@ -54,11 +61,12 @@ public partial class SpellEditorViewModel : ViewModelBase {
     public WorldBuilderSettings Settings { get; }
 
     public SpellEditorViewModel(WorldBuilderSettings settings, Project project, IDocumentManager documentManager,
-        IDatReaderWriter dats) {
+        IDatReaderWriter dats, IDialogService dialogService) {
         Settings = settings;
         _project = project;
         _documentManager = documentManager;
         _dats = dats;
+        _dialogService = dialogService;
     }
 
     public async Task InitializeAsync(CancellationToken ct = default) {
@@ -190,7 +198,7 @@ public partial class SpellEditorViewModel : ViewModelBase {
         if (_allSpells.Count > 0)
             nextId = _allSpells.Keys.Max() + 1;
 
-        var newSpell = new SpellBase { Name = $"New Spell {nextId}", Description = "" };
+        var newSpell = new SpellRow { Name = $"New Spell {nextId}", Description = "" };
         _allSpells[nextId] = newSpell;
         TotalSpellCount = _allSpells.Count;
         ApplyFilter();
@@ -239,6 +247,193 @@ public partial class SpellEditorViewModel : ViewModelBase {
 
         StatusText = $"Saved spell #{id}: {spell.Name} to project. Use File → Export Dats for client_portal.dat.";
     }
+
+    private string GetSuggestedDocumentsDirectory() =>
+        string.IsNullOrEmpty(Settings.App.ProjectsDirectory)
+            ? global::System.Environment.GetFolderPath(global::System.Environment.SpecialFolder.MyDocuments)
+            : Settings.App.ProjectsDirectory;
+
+    private async Task ApplyImportedSpellTableAsync(SpellTableExportFile doc, string path, CancellationToken ct) {
+        doc.Spells ??= new List<SpellExportDto>();
+        var ids = doc.Spells.Select(s => s.Id).ToList();
+        if (ids.Count != ids.Distinct().Count()) {
+            await _dialogService.ShowMessageBoxAsync(null, "Duplicate spell IDs in the import file.", "Import failed");
+            return;
+        }
+
+        SpellTableJsonSerializer.ReplaceSpellTable(_spellTable!, doc);
+        _portalDoc!.SetEntry(SpellTableId, _spellTable!);
+        await PersistPortalAsync(ct);
+
+        SelectedSpell = null;
+        TotalSpellCount = _allSpells!.Count;
+        ApplyFilter();
+        StatusText = $"Imported {_allSpells.Count} spells from {Path.GetFileName(path)}. Use File → Export Dats for client_portal.dat.";
+    }
+
+    [RelayCommand]
+    private async Task ExportSpellsAsync(CancellationToken ct) {
+        if (_allSpells == null) return;
+
+        var suggestedDir = GetSuggestedDocumentsDirectory();
+
+        var file = await TopLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions {
+            Title = "Export spell table (JSON)",
+            DefaultExtension = "json",
+            SuggestedFileName = "spell-table.json",
+            SuggestedStartLocation = await TopLevel.StorageProvider.TryGetFolderFromPathAsync(suggestedDir),
+            FileTypeChoices = new[] {
+                new FilePickerFileType("Spell table JSON") { Patterns = new[] { "*.json" } },
+            },
+        });
+
+        if (file == null) return;
+
+        var path = file.TryGetLocalPath();
+        if (string.IsNullOrWhiteSpace(path)) {
+            await _dialogService.ShowMessageBoxAsync(null, "Could not resolve a local path for that file.", "Export failed");
+            return;
+        }
+
+        try {
+            var payload = SpellTableJsonSerializer.FromSpells(_allSpells);
+            await File.WriteAllTextAsync(path, SpellTableJsonSerializer.Serialize(payload), ct);
+            StatusText = $"Exported {_allSpells.Count} spells to {Path.GetFileName(path)}.";
+        }
+        catch (Exception ex) {
+            await _dialogService.ShowMessageBoxAsync(null, ex.Message, "Export failed");
+        }
+    }
+
+    [RelayCommand]
+    private async Task ExportSpellsCsvAsync(CancellationToken ct) {
+        if (_allSpells == null) return;
+
+        var suggestedDir = GetSuggestedDocumentsDirectory();
+
+        var file = await TopLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions {
+            Title = "Export spell table (CSV)",
+            DefaultExtension = "csv",
+            SuggestedFileName = "spell-table.csv",
+            SuggestedStartLocation = await TopLevel.StorageProvider.TryGetFolderFromPathAsync(suggestedDir),
+            FileTypeChoices = new[] {
+                new FilePickerFileType("Spell table CSV") { Patterns = new[] { "*.csv" } },
+            },
+        });
+
+        if (file == null) return;
+
+        var path = file.TryGetLocalPath();
+        if (string.IsNullOrWhiteSpace(path)) {
+            await _dialogService.ShowMessageBoxAsync(null, "Could not resolve a local path for that file.", "Export failed");
+            return;
+        }
+
+        try {
+            await File.WriteAllTextAsync(path, SpellTableCsvSerializer.Serialize(_allSpells), ct);
+            StatusText = $"Exported {_allSpells.Count} spells to {Path.GetFileName(path)} (CSV).";
+        }
+        catch (Exception ex) {
+            await _dialogService.ShowMessageBoxAsync(null, ex.Message, "Export failed");
+        }
+    }
+
+    [RelayCommand]
+    private async Task ImportSpellsAsync(CancellationToken ct) {
+        if (!IsSpellEditingEnabled || _spellTable == null || _portalDoc == null || _allSpells == null) return;
+
+        var suggestedDir = GetSuggestedDocumentsDirectory();
+
+        var files = await TopLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions {
+            Title = "Import spell table — JSON (replaces all spells)",
+            AllowMultiple = false,
+            SuggestedStartLocation = await TopLevel.StorageProvider.TryGetFolderFromPathAsync(suggestedDir),
+            FileTypeFilter = new[] {
+                new FilePickerFileType("Spell table JSON") { Patterns = new[] { "*.json" } },
+            },
+        });
+
+        if (files.Count == 0) return;
+
+        var path = files[0].TryGetLocalPath();
+        if (string.IsNullOrWhiteSpace(path)) {
+            await _dialogService.ShowMessageBoxAsync(null, "Could not resolve a local path for that file.", "Import failed");
+            return;
+        }
+
+        var confirm = await _dialogService.ShowMessageBoxAsync(null,
+            "This will remove every spell in the current project spell table and replace it with the JSON file contents.\n\n"
+            + "This cannot be undone except by reverting project data.\n\nContinue?",
+            "Replace entire spell table?",
+            MessageBoxButton.YesNo);
+
+        if (confirm != true) return;
+
+        try {
+            var json = await File.ReadAllTextAsync(path, ct);
+            var doc = SpellTableJsonSerializer.Deserialize(json);
+            var version = doc.FormatVersion == 0 ? 1 : doc.FormatVersion;
+            if (version < 1 || version > SpellTableImportExport.CurrentFormatVersion) {
+                await _dialogService.ShowMessageBoxAsync(null,
+                    $"Unsupported formatVersion {doc.FormatVersion} (expected 1–{SpellTableImportExport.CurrentFormatVersion}, or omit for 1).",
+                    "Import failed");
+                return;
+            }
+
+            await ApplyImportedSpellTableAsync(doc, path, ct);
+        }
+        catch (JsonException ex) {
+            await _dialogService.ShowMessageBoxAsync(null, $"Invalid JSON: {ex.Message}", "Import failed");
+        }
+        catch (Exception ex) {
+            await _dialogService.ShowMessageBoxAsync(null, ex.Message, "Import failed");
+        }
+    }
+
+    [RelayCommand]
+    private async Task ImportSpellsCsvAsync(CancellationToken ct) {
+        if (!IsSpellEditingEnabled || _spellTable == null || _portalDoc == null || _allSpells == null) return;
+
+        var suggestedDir = GetSuggestedDocumentsDirectory();
+
+        var files = await TopLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions {
+            Title = "Import spell table — CSV (replaces all spells)",
+            AllowMultiple = false,
+            SuggestedStartLocation = await TopLevel.StorageProvider.TryGetFolderFromPathAsync(suggestedDir),
+            FileTypeFilter = new[] {
+                new FilePickerFileType("Spell table CSV") { Patterns = new[] { "*.csv" } },
+            },
+        });
+
+        if (files.Count == 0) return;
+
+        var path = files[0].TryGetLocalPath();
+        if (string.IsNullOrWhiteSpace(path)) {
+            await _dialogService.ShowMessageBoxAsync(null, "Could not resolve a local path for that file.", "Import failed");
+            return;
+        }
+
+        var confirm = await _dialogService.ShowMessageBoxAsync(null,
+            "This will remove every spell in the current project spell table and replace it with the CSV file contents.\n\n"
+            + "The first row must be the header row from a spell editor CSV export.\n\n"
+            + "This cannot be undone except by reverting project data.\n\nContinue?",
+            "Replace entire spell table?",
+            MessageBoxButton.YesNo);
+
+        if (confirm != true) return;
+
+        try {
+            var csv = await File.ReadAllTextAsync(path, ct);
+            var doc = SpellTableCsvSerializer.Parse(csv);
+            await ApplyImportedSpellTableAsync(doc, path, ct);
+        }
+        catch (FormatException ex) {
+            await _dialogService.ShowMessageBoxAsync(null, ex.Message, "Import failed");
+        }
+        catch (Exception ex) {
+            await _dialogService.ShowMessageBoxAsync(null, ex.Message, "Import failed");
+        }
+    }
 }
 
 public class SpellListItem {
@@ -249,7 +444,7 @@ public class SpellListItem {
     public uint Power { get; }
     public uint BaseMana { get; }
 
-    public SpellListItem(uint id, SpellBase spell) {
+    public SpellListItem(uint id, SpellRow spell) {
         Id = id;
         Name = spell.Name?.ToString() ?? "";
         School = spell.School;
@@ -384,8 +579,8 @@ public partial class SpellDetailViewModel : ObservableObject {
     private uint _extraBitfieldBits;
     private uint _extraTargetTypeBits;
 
-    public SpellDetailViewModel(uint id, SpellBase spell, SpellComponentTable? componentTable,
-        Dictionary<uint, SpellBase> allSpells, IDatReaderWriter dats) {
+    public SpellDetailViewModel(uint id, SpellRow spell, SpellComponentTable? componentTable,
+        Dictionary<uint, SpellRow> allSpells, IDatReaderWriter dats) {
         _componentTable = componentTable;
         _dats = dats;
 
@@ -460,7 +655,7 @@ public partial class SpellDetailViewModel : ObservableObject {
         OnPropertyChanged(nameof(CanAddComponent));
     }
 
-    private void BuildAvailableIcons(Dictionary<uint, SpellBase> allSpells) {
+    private void BuildAvailableIcons(Dictionary<uint, SpellRow> allSpells) {
         var snapshot = allSpells.Values.ToArray();
         var uniqueIconIds = snapshot
             .Select(s => s.Icon)
@@ -584,7 +779,7 @@ public partial class SpellDetailViewModel : ObservableObject {
         OnPropertyChanged(nameof(TargetTypeDisplay));
     }
 
-    public void ApplyTo(SpellBase spell) {
+    public void ApplyTo(SpellRow spell) {
         spell.Name = Name;
         spell.Description = Description;
         spell.School = School;

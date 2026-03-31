@@ -1,4 +1,4 @@
-﻿using DatReaderWriter;
+using DatReaderWriter;
 using DatReaderWriter.DBObjs;
 using DatReaderWriter.Enums;
 using DatReaderWriter.Lib.IO;
@@ -211,6 +211,8 @@ namespace WorldBuilder.Shared.Services {
 
         /// <inheritdoc/>
         public void Dispose() {
+            _objCache.Clear();
+            Db.Dispose();
         }
     }
 }
