@@ -197,9 +197,11 @@ namespace WorldBuilder.Lib.Extensions {
 
             collection.AddSingleton<WorldBuilder.Modules.Landscape.LandscapeViewModel>();
             collection.AddSingleton<WorldBuilder.Modules.Spell.SpellEditorViewModel>();
+            collection.AddSingleton<WorldBuilder.Modules.Skill.SkillEditorViewModel>();
             collection.AddSingleton<IToolModule, WorldBuilder.Modules.Landscape.LandscapeModule>();
             collection.AddSingleton<IToolModule, WorldBuilder.Modules.DatBrowser.DatBrowserModule>();
             collection.AddSingleton<IToolModule, WorldBuilder.Modules.Spell.SpellEditorModule>();
+            collection.AddSingleton<IToolModule, WorldBuilder.Modules.Skill.SkillEditorModule>();
 
             collection.AddSingleton<TextureService>();
             collection.AddSingleton<MeshManagerService>();
