@@ -1,4 +1,4 @@
-using System.Text.Json;
+using DatReaderWriter.DBObjs;
 using DatReaderWriter.Enums;
 using SpellItemType = DatReaderWriter.Enums.ItemType;
 using SpellRow = DatReaderWriter.Types.SpellBase;
@@ -7,6 +7,13 @@ namespace WorldBuilder.Modules.Spell;
 
 internal static class SpellTableImportExport {
     public const int CurrentFormatVersion = 1;
+
+    public static void ReplaceSpellTable(SpellTable table, SpellTableExportFile file) {
+        var rows = file.Spells ?? new List<SpellExportDto>();
+        table.Spells.Clear();
+        foreach (var dto in rows.OrderBy(s => s.Id))
+            table.Spells[dto.Id] = dto.ToSpell();
+    }
 }
 
 internal sealed class SpellTableExportFile {
@@ -107,25 +114,4 @@ internal sealed class SpellExportDto {
         ManaMod = ManaMod,
         Components = Components is { Count: > 0 } ? new List<uint>(Components) : new List<uint>(),
     };
-}
-
-internal static class SpellTableJsonSerializer {
-    public static string Serialize(SpellTableExportFile file) =>
-        JsonSerializer.Serialize(file, SpellTableJsonSerializerContext.Default.SpellTableExportFile);
-
-    public static SpellTableExportFile Deserialize(string json) =>
-        JsonSerializer.Deserialize(json, SpellTableJsonSerializerContext.Default.SpellTableExportFile)
-        ?? throw new JsonException("Root JSON value was null.");
-
-    public static SpellTableExportFile FromSpells(Dictionary<uint, SpellRow> spells) => new() {
-        FormatVersion = SpellTableImportExport.CurrentFormatVersion,
-        Spells = spells.OrderBy(kvp => kvp.Key).Select(kvp => SpellExportDto.FromSpell(kvp.Key, kvp.Value)).ToList(),
-    };
-
-    public static void ReplaceSpellTable(DatReaderWriter.DBObjs.SpellTable table, SpellTableExportFile file) {
-        var rows = file.Spells ?? new List<SpellExportDto>();
-        table.Spells.Clear();
-        foreach (var dto in rows.OrderBy(s => s.Id))
-            table.Spells[dto.Id] = dto.ToSpell();
-    }
 }

@@ -10,7 +10,6 @@ using DatReaderWriter.Enums;
 using DatReaderWriter.Types;
 using System.Collections.ObjectModel;
 using System.IO;
-using System.Text.Json;
 using SpellItemType = DatReaderWriter.Enums.ItemType;
 using SpellRow = DatReaderWriter.Types.SpellBase;
 using WorldBuilder.Lib;
@@ -174,7 +173,7 @@ public partial class SpellEditorViewModel : ViewModelBase {
                 if (FilterSpellType.HasValue && kvp.Value.MetaSpellType != FilterSpellType.Value) return false;
                 return true;
             })
-            .OrderBy(kvp => kvp.Key)
+            .OrderBy(kvp => kvp.Value.DisplayOrder).ThenBy(kvp => kvp.Key)
             .Take(500)
             .Select(kvp => new SpellListItem(kvp.Key, kvp.Value))
             .ToList();
@@ -253,6 +252,17 @@ public partial class SpellEditorViewModel : ViewModelBase {
             ? global::System.Environment.GetFolderPath(global::System.Environment.SpecialFolder.MyDocuments)
             : Settings.App.ProjectsDirectory;
 
+    private string GetSpellImportSuggestedDirectory() {
+        var last = Settings.App.LastSpellTableImportDirectory;
+        if (!string.IsNullOrWhiteSpace(last) && Directory.Exists(last)) return last;
+        return GetSuggestedDocumentsDirectory();
+    }
+
+    private void RememberSpellImportDirectory(string filePath) {
+        var dir = Path.GetDirectoryName(filePath);
+        if (!string.IsNullOrEmpty(dir)) Settings.App.LastSpellTableImportDirectory = dir;
+    }
+
     private async Task ApplyImportedSpellTableAsync(SpellTableExportFile doc, string path, CancellationToken ct) {
         doc.Spells ??= new List<SpellExportDto>();
         var ids = doc.Spells.Select(s => s.Id).ToList();
@@ -261,7 +271,7 @@ public partial class SpellEditorViewModel : ViewModelBase {
             return;
         }
 
-        SpellTableJsonSerializer.ReplaceSpellTable(_spellTable!, doc);
+        SpellTableImportExport.ReplaceSpellTable(_spellTable!, doc);
         _portalDoc!.SetEntry(SpellTableId, _spellTable!);
         await PersistPortalAsync(ct);
 
@@ -269,40 +279,6 @@ public partial class SpellEditorViewModel : ViewModelBase {
         TotalSpellCount = _allSpells!.Count;
         ApplyFilter();
         StatusText = $"Imported {_allSpells.Count} spells from {Path.GetFileName(path)}. Use File → Export Dats for client_portal.dat.";
-    }
-
-    [RelayCommand]
-    private async Task ExportSpellsAsync(CancellationToken ct) {
-        if (_allSpells == null) return;
-
-        var suggestedDir = GetSuggestedDocumentsDirectory();
-
-        var file = await TopLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions {
-            Title = "Export spell table (JSON)",
-            DefaultExtension = "json",
-            SuggestedFileName = "spell-table.json",
-            SuggestedStartLocation = await TopLevel.StorageProvider.TryGetFolderFromPathAsync(suggestedDir),
-            FileTypeChoices = new[] {
-                new FilePickerFileType("Spell table JSON") { Patterns = new[] { "*.json" } },
-            },
-        });
-
-        if (file == null) return;
-
-        var path = file.TryGetLocalPath();
-        if (string.IsNullOrWhiteSpace(path)) {
-            await _dialogService.ShowMessageBoxAsync(null, "Could not resolve a local path for that file.", "Export failed");
-            return;
-        }
-
-        try {
-            var payload = SpellTableJsonSerializer.FromSpells(_allSpells);
-            await File.WriteAllTextAsync(path, SpellTableJsonSerializer.Serialize(payload), ct);
-            StatusText = $"Exported {_allSpells.Count} spells to {Path.GetFileName(path)}.";
-        }
-        catch (Exception ex) {
-            await _dialogService.ShowMessageBoxAsync(null, ex.Message, "Export failed");
-        }
     }
 
     [RelayCommand]
@@ -339,62 +315,10 @@ public partial class SpellEditorViewModel : ViewModelBase {
     }
 
     [RelayCommand]
-    private async Task ImportSpellsAsync(CancellationToken ct) {
-        if (!IsSpellEditingEnabled || _spellTable == null || _portalDoc == null || _allSpells == null) return;
-
-        var suggestedDir = GetSuggestedDocumentsDirectory();
-
-        var files = await TopLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions {
-            Title = "Import spell table — JSON (replaces all spells)",
-            AllowMultiple = false,
-            SuggestedStartLocation = await TopLevel.StorageProvider.TryGetFolderFromPathAsync(suggestedDir),
-            FileTypeFilter = new[] {
-                new FilePickerFileType("Spell table JSON") { Patterns = new[] { "*.json" } },
-            },
-        });
-
-        if (files.Count == 0) return;
-
-        var path = files[0].TryGetLocalPath();
-        if (string.IsNullOrWhiteSpace(path)) {
-            await _dialogService.ShowMessageBoxAsync(null, "Could not resolve a local path for that file.", "Import failed");
-            return;
-        }
-
-        var confirm = await _dialogService.ShowMessageBoxAsync(null,
-            "This will remove every spell in the current project spell table and replace it with the JSON file contents.\n\n"
-            + "This cannot be undone except by reverting project data.\n\nContinue?",
-            "Replace entire spell table?",
-            MessageBoxButton.YesNo);
-
-        if (confirm != true) return;
-
-        try {
-            var json = await File.ReadAllTextAsync(path, ct);
-            var doc = SpellTableJsonSerializer.Deserialize(json);
-            var version = doc.FormatVersion == 0 ? 1 : doc.FormatVersion;
-            if (version < 1 || version > SpellTableImportExport.CurrentFormatVersion) {
-                await _dialogService.ShowMessageBoxAsync(null,
-                    $"Unsupported formatVersion {doc.FormatVersion} (expected 1–{SpellTableImportExport.CurrentFormatVersion}, or omit for 1).",
-                    "Import failed");
-                return;
-            }
-
-            await ApplyImportedSpellTableAsync(doc, path, ct);
-        }
-        catch (JsonException ex) {
-            await _dialogService.ShowMessageBoxAsync(null, $"Invalid JSON: {ex.Message}", "Import failed");
-        }
-        catch (Exception ex) {
-            await _dialogService.ShowMessageBoxAsync(null, ex.Message, "Import failed");
-        }
-    }
-
-    [RelayCommand]
     private async Task ImportSpellsCsvAsync(CancellationToken ct) {
         if (!IsSpellEditingEnabled || _spellTable == null || _portalDoc == null || _allSpells == null) return;
 
-        var suggestedDir = GetSuggestedDocumentsDirectory();
+        var suggestedDir = GetSpellImportSuggestedDirectory();
 
         var files = await TopLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions {
             Title = "Import spell table — CSV (replaces all spells)",
@@ -413,9 +337,11 @@ public partial class SpellEditorViewModel : ViewModelBase {
             return;
         }
 
+        RememberSpellImportDirectory(path);
+
         var confirm = await _dialogService.ShowMessageBoxAsync(null,
             "This will remove every spell in the current project spell table and replace it with the CSV file contents.\n\n"
-            + "The first row must be the header row from a spell editor CSV export.\n\n"
+            + "The first row must name the spell columns (order does not matter; extra columns are ignored).\n\n"
             + "This cannot be undone except by reverting project data.\n\nContinue?",
             "Replace entire spell table?",
             MessageBoxButton.YesNo);

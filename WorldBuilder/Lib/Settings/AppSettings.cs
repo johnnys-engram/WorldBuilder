@@ -88,6 +88,11 @@ namespace WorldBuilder.Lib.Settings {
         private string _lastBaseDatDirectory = string.Empty;
         public string LastBaseDatDirectory { get => _lastBaseDatDirectory; set => SetProperty(ref _lastBaseDatDirectory, value); }
 
+        [SettingHidden]
+        [SettingOrder(6.5)]
+        private string _lastSpellTableImportDirectory = string.Empty;
+        public string LastSpellTableImportDirectory { get => _lastSpellTableImportDirectory; set => SetProperty(ref _lastSpellTableImportDirectory, value); }
+
         [SettingDescription("Application Theme")]
         [SettingOrder(7)]
         private AppTheme _theme = AppTheme.Default;
