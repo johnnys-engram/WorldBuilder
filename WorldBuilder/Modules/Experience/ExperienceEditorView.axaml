@@ -64,6 +64,16 @@
                             ToolTip.Tip="Save all changes to the experience table DAT"
                             Foreground="{DynamicResource SemiColorSuccess}"
                             IsEnabled="{Binding IsExperienceEditingEnabled}" />
+                    <Button Classes="toolbar-btn"
+                            Content="Export section CSV…"
+                            Command="{Binding ExportExperienceSectionCsvCommand}"
+                            ToolTip.Tip="Export the current tab (Levels, Attributes, Vitals, Trained, or Specialized) to a CSV file"
+                            IsEnabled="{Binding CanExportExperienceSectionCsv}" />
+                    <Button Classes="toolbar-btn"
+                            Content="Import section CSV…"
+                            Command="{Binding ImportExperienceSectionCsvCommand}"
+                            ToolTip.Tip="Replace only the current tab’s data from a CSV file"
+                            IsEnabled="{Binding CanImportExperienceSectionCsv}" />
                     <Border Classes="module-chrome-split" />
                     <Button Classes="toolbar-btn"
                             Content="+ Level"

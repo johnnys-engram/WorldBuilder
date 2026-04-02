@@ -1,8 +1,11 @@
+using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DatReaderWriter.DBObjs;
 using HanumanInstitute.MvvmDialogs;
+using HanumanInstitute.MvvmDialogs.FrameworkDialogs;
 using System.Collections.ObjectModel;
+using System.IO;
 using WorldBuilder.Lib;
 using WorldBuilder.Services;
 using WorldBuilder.Shared.Models;
@@ -37,6 +40,7 @@ public partial class ExperienceEditorViewModel : ViewModelBase {
     private readonly Project _project;
     private readonly IDocumentManager _documentManager;
     private readonly IDatReaderWriter _dats;
+    private readonly IDialogService _dialogService;
     private DocumentRental<PortalDatDocument>? _portalRental;
     private PortalDatDocument? _portalDoc;
     private ExperienceTable? _table;
@@ -78,8 +82,20 @@ public partial class ExperienceEditorViewModel : ViewModelBase {
         _project = project;
         _documentManager = documentManager;
         _dats = dats;
-        _ = dialogService;
+        _dialogService = dialogService;
     }
+
+    public bool CanExportExperienceSectionCsv => _table != null
+        && ExperienceSectionCsvSerializer.TryGetSection(SelectedTabIndex, out _);
+
+    public bool CanImportExperienceSectionCsv => IsExperienceEditingEnabled && CanExportExperienceSectionCsv;
+
+    partial void OnSelectedTabIndexChanged(int value) {
+        OnPropertyChanged(nameof(CanExportExperienceSectionCsv));
+        OnPropertyChanged(nameof(CanImportExperienceSectionCsv));
+    }
+
+    partial void OnIsExperienceEditingEnabledChanged(bool value) => OnPropertyChanged(nameof(CanImportExperienceSectionCsv));
 
     public async Task InitializeAsync(CancellationToken ct = default) {
         if (_initialized) return;
@@ -115,6 +131,8 @@ public partial class ExperienceEditorViewModel : ViewModelBase {
 
         _table = datTable;
         PopulateCollections();
+        OnPropertyChanged(nameof(CanExportExperienceSectionCsv));
+        OnPropertyChanged(nameof(CanImportExperienceSectionCsv));
         StatusText = $"Loaded (read-only): {_table.Levels.Length} levels, {_table.Attributes.Length} attribute ranks, " +
                      $"{_table.Vitals.Length} vital ranks, {_table.TrainedSkills.Length} trained, " +
                      $"{_table.SpecializedSkills.Length} specialized";
@@ -133,6 +151,8 @@ public partial class ExperienceEditorViewModel : ViewModelBase {
         }
 
         PopulateCollections();
+        OnPropertyChanged(nameof(CanExportExperienceSectionCsv));
+        OnPropertyChanged(nameof(CanImportExperienceSectionCsv));
         StatusText = $"Loaded: {_table.Levels.Length} levels, {_table.Attributes.Length} attribute ranks, " +
                      $"{_table.Vitals.Length} vital ranks, {_table.TrainedSkills.Length} trained, " +
                      $"{_table.SpecializedSkills.Length} specialized";
@@ -320,6 +340,33 @@ public partial class ExperienceEditorViewModel : ViewModelBase {
         };
     }
 
+    private void SyncUiToExperienceTable() {
+        if (_table == null) return;
+
+        _table.Levels = new ulong[Levels.Count];
+        _table.SkillCredits = new uint[Levels.Count];
+        for (int i = 0; i < Levels.Count; i++) {
+            _table.Levels[i] = ulong.TryParse(Levels[i].XpRequired, out var xp) ? xp : 0;
+            _table.SkillCredits[i] = uint.TryParse(Levels[i].SkillCredits, out var sc) ? sc : 0;
+        }
+
+        _table.Attributes = new uint[Attributes.Count];
+        for (int i = 0; i < Attributes.Count; i++)
+            _table.Attributes[i] = uint.TryParse(Attributes[i].Value, out var v) ? v : 0;
+
+        _table.Vitals = new uint[Vitals.Count];
+        for (int i = 0; i < Vitals.Count; i++)
+            _table.Vitals[i] = uint.TryParse(Vitals[i].Value, out var v) ? v : 0;
+
+        _table.TrainedSkills = new uint[TrainedSkills.Count];
+        for (int i = 0; i < TrainedSkills.Count; i++)
+            _table.TrainedSkills[i] = uint.TryParse(TrainedSkills[i].Value, out var v) ? v : 0;
+
+        _table.SpecializedSkills = new uint[SpecializedSkills.Count];
+        for (int i = 0; i < SpecializedSkills.Count; i++)
+            _table.SpecializedSkills[i] = uint.TryParse(SpecializedSkills[i].Value, out var v) ? v : 0;
+    }
+
     [RelayCommand]
     private async Task SaveAsync(CancellationToken ct) {
         if (!IsExperienceEditingEnabled || _table == null || _portalDoc == null) {
@@ -328,28 +375,7 @@ public partial class ExperienceEditorViewModel : ViewModelBase {
         }
 
         try {
-            _table.Levels = new ulong[Levels.Count];
-            _table.SkillCredits = new uint[Levels.Count];
-            for (int i = 0; i < Levels.Count; i++) {
-                _table.Levels[i] = ulong.TryParse(Levels[i].XpRequired, out var xp) ? xp : 0;
-                _table.SkillCredits[i] = uint.TryParse(Levels[i].SkillCredits, out var sc) ? sc : 0;
-            }
-
-            _table.Attributes = new uint[Attributes.Count];
-            for (int i = 0; i < Attributes.Count; i++)
-                _table.Attributes[i] = uint.TryParse(Attributes[i].Value, out var v) ? v : 0;
-
-            _table.Vitals = new uint[Vitals.Count];
-            for (int i = 0; i < Vitals.Count; i++)
-                _table.Vitals[i] = uint.TryParse(Vitals[i].Value, out var v) ? v : 0;
-
-            _table.TrainedSkills = new uint[TrainedSkills.Count];
-            for (int i = 0; i < TrainedSkills.Count; i++)
-                _table.TrainedSkills[i] = uint.TryParse(TrainedSkills[i].Value, out var v) ? v : 0;
-
-            _table.SpecializedSkills = new uint[SpecializedSkills.Count];
-            for (int i = 0; i < SpecializedSkills.Count; i++)
-                _table.SpecializedSkills[i] = uint.TryParse(SpecializedSkills[i].Value, out var v) ? v : 0;
+            SyncUiToExperienceTable();
 
             _portalDoc.SetEntry(ExperienceTableId, _table);
             await PersistPortalAsync(ct);
@@ -359,6 +385,138 @@ public partial class ExperienceEditorViewModel : ViewModelBase {
         }
         catch (Exception ex) {
             StatusText = $"Save error: {ex.Message}";
+        }
+    }
+
+    private string GetSuggestedDocumentsDirectory() =>
+        string.IsNullOrEmpty(Settings.App.ProjectsDirectory)
+            ? global::System.Environment.GetFolderPath(global::System.Environment.SpecialFolder.MyDocuments)
+            : Settings.App.ProjectsDirectory;
+
+    private string GetExperienceImportSuggestedDirectory() {
+        var last = Settings.App.LastExperienceTableImportDirectory;
+        if (!string.IsNullOrWhiteSpace(last) && Directory.Exists(last)) return last;
+        return GetSuggestedDocumentsDirectory();
+    }
+
+    private void RememberExperienceImportDirectory(string filePath) {
+        var dir = Path.GetDirectoryName(filePath);
+        if (!string.IsNullOrEmpty(dir)) Settings.App.LastExperienceTableImportDirectory = dir;
+    }
+
+    [RelayCommand]
+    private async Task ExportExperienceSectionCsvAsync(CancellationToken ct) {
+        if (_table == null || !ExperienceSectionCsvSerializer.TryGetSection(SelectedTabIndex, out var section))
+            return;
+
+        var suggestedDir = GetSuggestedDocumentsDirectory();
+        var stem = ExperienceSectionCsvSerializer.SectionFileStem(section);
+
+        var file = await TopLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions {
+            Title = $"Export {ExperienceSectionCsvSerializer.SectionDisplayName(section)} (CSV)",
+            DefaultExtension = "csv",
+            SuggestedFileName = $"{stem}.csv",
+            SuggestedStartLocation = await TopLevel.StorageProvider.TryGetFolderFromPathAsync(suggestedDir),
+            FileTypeChoices = new[] {
+                new FilePickerFileType("Experience table CSV") { Patterns = new[] { "*.csv" } },
+            },
+        });
+
+        if (file == null) return;
+
+        var path = file.TryGetLocalPath();
+        if (string.IsNullOrWhiteSpace(path)) {
+            await _dialogService.ShowMessageBoxAsync(null, "Could not resolve a local path for that file.", "Export failed");
+            return;
+        }
+
+        try {
+            var text = section switch {
+                ExperienceCsvSection.Levels => ExperienceSectionCsvSerializer.SerializeLevels(Levels),
+                ExperienceCsvSection.Attributes => ExperienceSectionCsvSerializer.SerializeRankSection(Attributes),
+                ExperienceCsvSection.Vitals => ExperienceSectionCsvSerializer.SerializeRankSection(Vitals),
+                ExperienceCsvSection.TrainedSkills => ExperienceSectionCsvSerializer.SerializeRankSection(TrainedSkills),
+                ExperienceCsvSection.SpecializedSkills => ExperienceSectionCsvSerializer.SerializeRankSection(SpecializedSkills),
+                _ => throw new InvalidOperationException("Unknown section."),
+            };
+            await File.WriteAllTextAsync(path, text, ct);
+            StatusText = $"Exported {ExperienceSectionCsvSerializer.SectionDisplayName(section)} to {Path.GetFileName(path)}.";
+        }
+        catch (Exception ex) {
+            await _dialogService.ShowMessageBoxAsync(null, ex.Message, "Export failed");
+        }
+    }
+
+    [RelayCommand]
+    private async Task ImportExperienceSectionCsvAsync(CancellationToken ct) {
+        if (!IsExperienceEditingEnabled || _table == null || _portalDoc == null) return;
+        if (!ExperienceSectionCsvSerializer.TryGetSection(SelectedTabIndex, out var section)) return;
+
+        var suggestedDir = GetExperienceImportSuggestedDirectory();
+        var files = await TopLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions {
+            Title = $"Import {ExperienceSectionCsvSerializer.SectionDisplayName(section)} — CSV (replaces this section only)",
+            AllowMultiple = false,
+            SuggestedStartLocation = await TopLevel.StorageProvider.TryGetFolderFromPathAsync(suggestedDir),
+            FileTypeFilter = new[] {
+                new FilePickerFileType("Experience table CSV") { Patterns = new[] { "*.csv" } },
+            },
+        });
+
+        if (files.Count == 0) return;
+
+        var path = files[0].TryGetLocalPath();
+        if (string.IsNullOrWhiteSpace(path)) {
+            await _dialogService.ShowMessageBoxAsync(null, "Could not resolve a local path for that file.", "Import failed");
+            return;
+        }
+
+        RememberExperienceImportDirectory(path);
+
+        var sectionLabel = ExperienceSectionCsvSerializer.SectionDisplayName(section);
+        var confirm = await _dialogService.ShowMessageBoxAsync(null,
+            $"This will replace only: {sectionLabel}\n\n"
+            + "Other experience tabs are kept as they are in the editor (including unsaved edits). "
+            + "The CSV index/level column must be contiguous starting at 0.\n\nContinue?",
+            "Replace experience section?",
+            MessageBoxButton.YesNo);
+
+        if (confirm != true) return;
+
+        try {
+            var csv = await File.ReadAllTextAsync(path, ct);
+            SyncUiToExperienceTable();
+
+            switch (section) {
+                case ExperienceCsvSection.Levels: {
+                    var parsed = ExperienceSectionCsvSerializer.ParseLevels(csv);
+                    _table.Levels = parsed.Levels;
+                    _table.SkillCredits = parsed.SkillCredits;
+                    break;
+                }
+                case ExperienceCsvSection.Attributes:
+                    _table.Attributes = ExperienceSectionCsvSerializer.ParseRankSection(csv);
+                    break;
+                case ExperienceCsvSection.Vitals:
+                    _table.Vitals = ExperienceSectionCsvSerializer.ParseRankSection(csv);
+                    break;
+                case ExperienceCsvSection.TrainedSkills:
+                    _table.TrainedSkills = ExperienceSectionCsvSerializer.ParseRankSection(csv);
+                    break;
+                case ExperienceCsvSection.SpecializedSkills:
+                    _table.SpecializedSkills = ExperienceSectionCsvSerializer.ParseRankSection(csv);
+                    break;
+            }
+
+            PopulateCollections();
+            _portalDoc.SetEntry(ExperienceTableId, _table);
+            await PersistPortalAsync(ct);
+            StatusText = $"Imported {sectionLabel} from {Path.GetFileName(path)}. Use File → Export Dats for client_portal.dat.";
+        }
+        catch (FormatException ex) {
+            await _dialogService.ShowMessageBoxAsync(null, ex.Message, "Import failed");
+        }
+        catch (Exception ex) {
+            await _dialogService.ShowMessageBoxAsync(null, ex.Message, "Import failed");
         }
     }
 }

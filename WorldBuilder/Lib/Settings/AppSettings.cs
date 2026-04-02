@@ -93,6 +93,16 @@ namespace WorldBuilder.Lib.Settings {
         private string _lastSpellTableImportDirectory = string.Empty;
         public string LastSpellTableImportDirectory { get => _lastSpellTableImportDirectory; set => SetProperty(ref _lastSpellTableImportDirectory, value); }
 
+        [SettingHidden]
+        [SettingOrder(6.55)]
+        private string _lastSkillTableImportDirectory = string.Empty;
+        public string LastSkillTableImportDirectory { get => _lastSkillTableImportDirectory; set => SetProperty(ref _lastSkillTableImportDirectory, value); }
+
+        [SettingHidden]
+        [SettingOrder(6.56)]
+        private string _lastExperienceTableImportDirectory = string.Empty;
+        public string LastExperienceTableImportDirectory { get => _lastExperienceTableImportDirectory; set => SetProperty(ref _lastExperienceTableImportDirectory, value); }
+
         [SettingDescription("Application Theme")]
         [SettingOrder(7)]
         private AppTheme _theme = AppTheme.Default;

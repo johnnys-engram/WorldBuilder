@@ -1,4 +1,5 @@
 using Avalonia.Media.Imaging;
+using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -6,8 +7,10 @@ using DatReaderWriter.DBObjs;
 using DatReaderWriter.Enums;
 using DatReaderWriter.Types;
 using HanumanInstitute.MvvmDialogs;
+using HanumanInstitute.MvvmDialogs.FrameworkDialogs;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Linq;
 using System.Windows.Input;
 using WorldBuilder.Lib;
@@ -22,6 +25,7 @@ public partial class SkillEditorViewModel : ViewModelBase {
     private readonly Project _project;
     private readonly IDocumentManager _documentManager;
     private readonly IDatReaderWriter _dats;
+    private readonly IDialogService _dialogService;
     private DocumentRental<PortalDatDocument>? _portalRental;
     private PortalDatDocument? _portalDoc;
     private SkillTable? _skillTable;
@@ -51,7 +55,7 @@ public partial class SkillEditorViewModel : ViewModelBase {
         _project = project;
         _documentManager = documentManager;
         _dats = dats;
-        _ = dialogService;
+        _dialogService = dialogService;
     }
 
     public async Task InitializeAsync(CancellationToken ct = default) {
@@ -228,6 +232,121 @@ public partial class SkillEditorViewModel : ViewModelBase {
         }
 
         StatusText = $"Saved skill {skill.Name} to project. Use File → Export Dats for client_portal.dat.";
+    }
+
+    private string GetSuggestedDocumentsDirectory() =>
+        string.IsNullOrEmpty(Settings.App.ProjectsDirectory)
+            ? global::System.Environment.GetFolderPath(global::System.Environment.SpecialFolder.MyDocuments)
+            : Settings.App.ProjectsDirectory;
+
+    private string GetSkillImportSuggestedDirectory() {
+        var last = Settings.App.LastSkillTableImportDirectory;
+        if (!string.IsNullOrWhiteSpace(last) && Directory.Exists(last)) return last;
+        return GetSuggestedDocumentsDirectory();
+    }
+
+    private void RememberSkillImportDirectory(string filePath) {
+        var dir = Path.GetDirectoryName(filePath);
+        if (!string.IsNullOrEmpty(dir)) Settings.App.LastSkillTableImportDirectory = dir;
+    }
+
+    private async Task ApplyImportedSkillTableAsync(SkillTableExportFile doc, string path, CancellationToken ct) {
+        doc.Skills ??= new List<SkillExportDto>();
+        var ids = doc.Skills.Select(s => s.Id).ToList();
+        if (ids.Count != ids.Distinct().Count()) {
+            await _dialogService.ShowMessageBoxAsync(null, "Duplicate skill IDs in the import file.", "Import failed");
+            return;
+        }
+
+        SkillTableImportExport.ReplaceSkillTable(_skillTable!, doc);
+        _portalDoc!.SetEntry(SkillTableId, _skillTable!);
+        await PersistPortalAsync(ct);
+
+        SelectedSkill = null;
+        SelectedDetail = null;
+        TotalSkillCount = _allSkills!.Count;
+        ApplyFilter();
+        StatusText = $"Imported {_allSkills.Count} skills from {Path.GetFileName(path)}. Use File → Export Dats for client_portal.dat.";
+    }
+
+    [RelayCommand]
+    private async Task ExportSkillsCsvAsync(CancellationToken ct) {
+        if (_allSkills == null) return;
+
+        var suggestedDir = GetSuggestedDocumentsDirectory();
+
+        var file = await TopLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions {
+            Title = "Export skill table (CSV)",
+            DefaultExtension = "csv",
+            SuggestedFileName = "skill-table.csv",
+            SuggestedStartLocation = await TopLevel.StorageProvider.TryGetFolderFromPathAsync(suggestedDir),
+            FileTypeChoices = new[] {
+                new FilePickerFileType("Skill table CSV") { Patterns = new[] { "*.csv" } },
+            },
+        });
+
+        if (file == null) return;
+
+        var path = file.TryGetLocalPath();
+        if (string.IsNullOrWhiteSpace(path)) {
+            await _dialogService.ShowMessageBoxAsync(null, "Could not resolve a local path for that file.", "Export failed");
+            return;
+        }
+
+        try {
+            await File.WriteAllTextAsync(path, SkillTableCsvSerializer.Serialize(_allSkills), ct);
+            StatusText = $"Exported {_allSkills.Count} skills to {Path.GetFileName(path)} (CSV).";
+        }
+        catch (Exception ex) {
+            await _dialogService.ShowMessageBoxAsync(null, ex.Message, "Export failed");
+        }
+    }
+
+    [RelayCommand]
+    private async Task ImportSkillsCsvAsync(CancellationToken ct) {
+        if (!IsSkillEditingEnabled || _skillTable == null || _portalDoc == null || _allSkills == null) return;
+
+        var suggestedDir = GetSkillImportSuggestedDirectory();
+
+        var files = await TopLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions {
+            Title = "Import skill table — CSV (replaces all skills)",
+            AllowMultiple = false,
+            SuggestedStartLocation = await TopLevel.StorageProvider.TryGetFolderFromPathAsync(suggestedDir),
+            FileTypeFilter = new[] {
+                new FilePickerFileType("Skill table CSV") { Patterns = new[] { "*.csv" } },
+            },
+        });
+
+        if (files.Count == 0) return;
+
+        var path = files[0].TryGetLocalPath();
+        if (string.IsNullOrWhiteSpace(path)) {
+            await _dialogService.ShowMessageBoxAsync(null, "Could not resolve a local path for that file.", "Import failed");
+            return;
+        }
+
+        RememberSkillImportDirectory(path);
+
+        var confirm = await _dialogService.ShowMessageBoxAsync(null,
+            "This will remove every skill in the current project skill table and replace it with the CSV file contents.\n\n"
+            + "The first row must name all required skill columns (order does not matter).\n\n"
+            + "This cannot be undone except by reverting project data.\n\nContinue?",
+            "Replace entire skill table?",
+            MessageBoxButton.YesNo);
+
+        if (confirm != true) return;
+
+        try {
+            var csv = await File.ReadAllTextAsync(path, ct);
+            var doc = SkillTableCsvSerializer.Parse(csv);
+            await ApplyImportedSkillTableAsync(doc, path, ct);
+        }
+        catch (FormatException ex) {
+            await _dialogService.ShowMessageBoxAsync(null, ex.Message, "Import failed");
+        }
+        catch (Exception ex) {
+            await _dialogService.ShowMessageBoxAsync(null, ex.Message, "Import failed");
+        }
     }
 }
 

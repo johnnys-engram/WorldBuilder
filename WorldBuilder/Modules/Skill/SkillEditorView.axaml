@@ -20,6 +20,9 @@
                     <Button Classes="toolbar-btn" Content="+ New Skill" Command="{Binding AddSkillCommand}" IsEnabled="{Binding IsSkillEditingEnabled}" />
                     <Button Classes="toolbar-btn" Content="Delete Skill" Command="{Binding DeleteSkillCommand}" Foreground="{DynamicResource SemiColorDanger}" IsEnabled="{Binding IsSkillEditingEnabled}" />
                     <Border Classes="module-chrome-split" />
+                    <Button Classes="toolbar-btn" Content="Export CSV…" Command="{Binding ExportSkillsCsvCommand}" />
+                    <Button Classes="toolbar-btn" Content="Import CSV…" Command="{Binding ImportSkillsCsvCommand}" IsEnabled="{Binding IsSkillEditingEnabled}" />
+                    <Border Classes="module-chrome-split" />
                     <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource SemiColorText2}" />
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Spacing="8" DockPanel.Dock="Right" HorizontalAlignment="Right">
@@ -78,7 +81,7 @@
                             <TextBlock Classes="section-header" Text="Identity" />
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <StackPanel Spacing="4">
-                                    <Border Width="48" Height="48" Background="{DynamicResource SemiColorFill1}" CornerRadius="4"
+                                    <Border Width="48" Height="48" Background="Transparent" CornerRadius="4"
                                             BorderBrush="{DynamicResource SemiColorBorder}" BorderThickness="1">
                                         <Image Source="{Binding IconBitmap}" Width="48" Height="48" Stretch="Uniform" />
                                     </Border>
