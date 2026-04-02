@@ -1,5 +1,6 @@
 <UserControl
     x:Class="WorldBuilder.Views.MainView"
+    x:Name="ViewRoot"
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -19,10 +20,28 @@
     <UserControl.Resources>
         <converters:StringToKeyGestureConverter x:Key="StringToKeyGestureConverter" />
     </UserControl.Resources>
+    <UserControl.Styles>
+        <Style Selector="ComboBox.main-editor-switcher">
+            <Setter Property="MinWidth" Value="260" />
+            <Setter Property="MaxWidth" Value="420" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Padding" Value="10,6,32,6" />
+            <Setter Property="Background" Value="{DynamicResource SemiColorFill1}" />
+            <Setter Property="Foreground" Value="{DynamicResource SemiColorText0}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SemiColorBorder}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+        </Style>
+        <Style Selector="ComboBox.main-editor-switcher:focus">
+            <Setter Property="BorderBrush" Value="{DynamicResource SemiColorPrimary}" />
+        </Style>
+    </UserControl.Styles>
     <dialog:DialogHost Identifier="MainDialogHost">
     <DockPanel>
         <!--  Menu Bar at the top  -->
-        <Grid DockPanel.Dock="Top" ColumnDefinitions="*, Auto">
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto, *, Auto">
             <Menu Grid.Column="0">
                 <MenuItem Header="File">
                     <MenuItem Command="{Binding OpenCommand}" Header="Open" />
@@ -31,17 +50,40 @@
                     <MenuItem Command="{Binding CloseProjectCommand}" Header="Close" />
                     <MenuItem Command="{Binding ExitApplicationCommand}" Header="Exit" InputGesture="{Binding ExitHotkeyText, Converter={StaticResource StringToKeyGestureConverter}}" />
                 </MenuItem>
-                
+
                 <MenuItem Header="Debug">
                     <MenuItem Command="{Binding OpenDebugWindowCommand}" Header="Avalonia Debug" />
                     <MenuItem Command="{Binding OpenGpuDebugWindowCommand}" Header="GPU Debug" />
                     <MenuItem Command="{Binding OpenAppLogWindowCommand}" Header="App Logs" />
                 </MenuItem>
-                
+
                 <MenuItem Command="{Binding OpenSettingsWindowCommand}" Header="Settings" />
             </Menu>
 
-            <Button Grid.Column="1"
+            <StackPanel Grid.Column="1"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Center"
+                        Margin="16,0,12,0"
+                        Spacing="10">
+                <TextBlock Text="Editor"
+                           VerticalAlignment="Center"
+                           FontSize="12"
+                           Foreground="{DynamicResource SemiColorText2}"
+                           FontWeight="SemiBold" />
+                <ComboBox Classes="main-editor-switcher"
+                          ItemsSource="{Binding ToolTabs}"
+                          SelectedItem="{Binding SelectedToolTab, Mode=TwoWay}">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ToolTabViewModel">
+                            <TextBlock Text="{Binding Name}"
+                                       TextTrimming="CharacterEllipsis"
+                                       VerticalAlignment="Center" />
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+            </StackPanel>
+
+            <Button Grid.Column="2"
                     VerticalAlignment="Center"
                     Margin="0,0,8,0"
                     Padding="4"
@@ -57,21 +99,8 @@
         <!-- Status Bar at the bottom -->
         <components:StatusBar DockPanel.Dock="Bottom" />
 
-        <!-- Main Content -->
-        <DockPanel>
-            <TabStrip DockPanel.Dock="Top" ItemsSource="{Binding ToolTabs}">
-                <TabStrip.ItemTemplate>
-                    <DataTemplate x:DataType="vm:ToolTabViewModel">
-                        <TextBlock Text="{Binding Name}" />
-                    </DataTemplate>
-                </TabStrip.ItemTemplate>
-                <TabStrip.Styles>
-                    <Style Selector="TabStripItem" x:DataType="vm:ToolTabViewModel">
-                        <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
-                    </Style>
-                </TabStrip.Styles>
-            </TabStrip>
-
+        <!-- Main content: active module from editor switcher -->
+        <DockPanel Background="{DynamicResource SemiColorFill0}">
             <ItemsControl ItemsSource="{Binding ToolTabs}">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>

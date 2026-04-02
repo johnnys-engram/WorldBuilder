@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
@@ -21,6 +21,7 @@ namespace WorldBuilder.Lib {
     [JsonSerializable(typeof(ProjectSettings))]
     [JsonSerializable(typeof(AppSettings))]
     [JsonSerializable(typeof(DatBrowserSettings))]
+    [JsonSerializable(typeof(AceWorldDatabaseSettings))]
     [JsonSerializable(typeof(AppTheme))]
     [JsonSerializable(typeof(Dictionary<string, bool>))]
     [JsonSerializable(typeof(CameraSettings))]

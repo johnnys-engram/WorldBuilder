@@ -279,7 +279,7 @@ namespace WorldBuilder.Modules.DatBrowser.ViewModels {
                     }
                 }
             }
-            else if (rootType == typeof(CharGen)) {
+            else if (rootType == typeof(global::DatReaderWriter.DBObjs.CharGen)) {
                 if (name == "EyeColors" || name == "HairColors") {
                     foreach (var child in children) {
                         if (uint.TryParse(child.Value, out var intValue))

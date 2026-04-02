@@ -113,6 +113,14 @@ public partial class DocumentManager : IDocumentManager, IDisposable {
                 }
                 _logger.LogTrace("Portal DAT document {DocumentId} inserted into database", document.Id);
             }
+            else if (document is LayoutDatDocument) {
+                var blob = document.Serialize();
+                var insertResult = await _repo.UpsertProjectDocumentAsync(document.Id, blob, document.Version, tx, ct);
+                if (insertResult.IsFailure) {
+                    return Result<DocumentRental<T>>.Failure(insertResult.Error);
+                }
+                _logger.LogTrace("Layout DAT document {DocumentId} inserted into database", document.Id);
+            }
             else {
                 return Result<DocumentRental<T>>.Failure($"Document type {typeof(T).Name} is not supported for generic persistence", "UNSUPPORTED_TYPE");
             }
@@ -169,6 +177,9 @@ public partial class DocumentManager : IDocumentManager, IDisposable {
             }
             else if (typeof(T) == typeof(PortalDatDocument) && id == PortalDatDocument.DocumentId) {
                 newDoc = await LoadOrCreatePortalDatDocumentAsync<T>(tx, ct);
+            }
+            else if (typeof(T) == typeof(LayoutDatDocument) && id == LayoutDatDocument.DocumentId) {
+                newDoc = await LoadOrCreateLayoutDatDocumentAsync<T>(tx, ct);
             }
 
             if (newDoc == null) {
@@ -232,6 +243,14 @@ public partial class DocumentManager : IDocumentManager, IDisposable {
         }
         else if (doc is PortalDatDocument) {
             _logger.LogTrace("Persisting portal DAT overlay document {DocumentId}", doc.Id);
+            var blob = doc.Serialize();
+            var updateResult = await _repo.UpsertProjectDocumentAsync(doc.Id, blob, doc.Version, tx, ct);
+            if (updateResult.IsFailure) {
+                return Result<Unit>.Failure(updateResult.Error);
+            }
+        }
+        else if (doc is LayoutDatDocument) {
+            _logger.LogTrace("Persisting layout DAT overlay document {DocumentId}", doc.Id);
             var blob = doc.Serialize();
             var updateResult = await _repo.UpsertProjectDocumentAsync(doc.Id, blob, doc.Version, tx, ct);
             if (updateResult.IsFailure) {
@@ -411,6 +430,22 @@ public partial class DocumentManager : IDocumentManager, IDisposable {
         }
 
         _logger.LogError("Failed to load PortalDatDocument: {Error}", blobResult.Error.Message);
+        return null;
+    }
+
+    private async Task<T?> LoadOrCreateLayoutDatDocumentAsync<T>(ITransaction? tx, CancellationToken ct) where T : BaseDocument {
+        var blobResult = await _repo.GetProjectDocumentBlobAsync(LayoutDatDocument.DocumentId, tx, ct);
+        if (blobResult.IsSuccess) {
+            var deserialized = BaseDocument.Deserialize<LayoutDatDocument>(blobResult.Value);
+            return deserialized as T;
+        }
+
+        if (blobResult.Error.Code == "NOT_FOUND_ERROR") {
+            _logger.LogTrace("Creating new empty LayoutDatDocument");
+            return new LayoutDatDocument() as T;
+        }
+
+        _logger.LogError("Failed to load LayoutDatDocument: {Error}", blobResult.Error.Message);
         return null;
     }
 

@@ -55,6 +55,17 @@ namespace WorldBuilder.Services {
             }
         }
 
+        private AceWorldDatabaseSettings _aceWorld = new();
+        public AceWorldDatabaseSettings AceWorld {
+            get => _aceWorld;
+            set {
+                if (_aceWorld != null) _aceWorld.PropertyChanged -= OnSubSettingsPropertyChanged;
+                if (SetProperty(ref _aceWorld, value) && _aceWorld != null) {
+                    _aceWorld.PropertyChanged += OnSubSettingsPropertyChanged;
+                }
+            }
+        }
+
         private ProjectSettings? _project;
         [JsonIgnore]
         public ProjectSettings? Project {
@@ -88,6 +99,9 @@ namespace WorldBuilder.Services {
             }
             if (_datBrowser != null) {
                 _datBrowser.PropertyChanged += OnSubSettingsPropertyChanged;
+            }
+            if (_aceWorld != null) {
+                _aceWorld.PropertyChanged += OnSubSettingsPropertyChanged;
             }
         }
 

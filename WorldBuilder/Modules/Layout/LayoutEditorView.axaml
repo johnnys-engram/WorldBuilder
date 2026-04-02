@@ -1,0 +1,263 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:WorldBuilder.Modules.Layout"
+             xmlns:conv="using:WorldBuilder.Converters"
+             mc:Ignorable="d" d:DesignWidth="1400" d:DesignHeight="800"
+             x:Class="WorldBuilder.Modules.Layout.LayoutEditorView"
+             x:DataType="vm:LayoutEditorViewModel">
+
+    <UserControl.Styles>
+        <StyleInclude Source="avares://WorldBuilder/Themes/EditorModuleStyles.axaml" />
+        <Style Selector="TextBlock.section-header">
+            <Setter Property="Margin" Value="0,10,0,4" />
+        </Style>
+    </UserControl.Styles>
+
+    <DockPanel>
+        <Border DockPanel.Dock="Top" Classes="module-toolbar">
+            <DockPanel LastChildFill="True">
+                <Button DockPanel.Dock="Right" Classes="toolbar-btn" Content="Save layout to project"
+                        Command="{Binding SaveLayoutToProjectCommand}"
+                        IsEnabled="{Binding IsLayoutEditingEnabled}"
+                        Foreground="{DynamicResource SemiColorSuccess}"
+                        Margin="12,0,0,0"
+                        ToolTip.Tip="Stores the current layout in the project (ui_layouts). Export DATs to apply." />
+                <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" TextWrapping="Wrap"
+                           FontSize="12" Foreground="{DynamicResource SemiColorText2}" />
+            </DockPanel>
+        </Border>
+
+        <Grid ColumnDefinitions="220,1,280,1,*">
+
+            <DockPanel Grid.Column="0" Background="{DynamicResource SemiColorBackground0}">
+                <Border DockPanel.Dock="Top" Background="{DynamicResource SemiColorFill0}" Padding="8,6"
+                        BorderBrush="{DynamicResource SemiColorBorder}" BorderThickness="0,0,0,1">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="UI Layouts" Classes="panel-caption" />
+                        <TextBox Text="{Binding SearchText}" Classes="search-box" Watermark="Filter by hex ID" />
+                    </StackPanel>
+                </Border>
+                <ListBox ItemsSource="{Binding FilteredLayouts}"
+                         SelectedItem="{Binding SelectedLayout}"
+                         FontSize="12" Classes="editor-listbox">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:LayoutListItem">
+                            <TextBlock Text="{Binding DisplayId}" FontFamily="Consolas"
+                                       Foreground="{DynamicResource SemiColorText0}" FontSize="11" Margin="4,2" />
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </DockPanel>
+
+            <GridSplitter Grid.Column="1" Width="1" Background="{DynamicResource SemiColorBorder}" ResizeDirection="Columns" />
+
+            <DockPanel Grid.Column="2" Background="{DynamicResource SemiColorFill0}">
+                <Border DockPanel.Dock="Top" Background="{DynamicResource SemiColorFill0}" Padding="8,6"
+                        BorderBrush="{DynamicResource SemiColorBorder}" BorderThickness="0,0,0,1">
+                    <TextBlock Text="Element Hierarchy" Classes="panel-caption" />
+                </Border>
+
+                <Panel>
+                    <TextBlock Text="Select a layout from the list"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                               Classes="editor-empty" Opacity="0.85"
+                               IsVisible="{Binding SelectedDetail, Converter={x:Static conv:ObjectConverters.IsNull}}" />
+
+                    <TreeView ItemsSource="{Binding SelectedDetail.RootElements}"
+                              SelectedItem="{Binding SelectedDetail.SelectedElement}"
+                              Background="Transparent" FontSize="11"
+                              IsVisible="{Binding SelectedDetail, Converter={x:Static conv:ObjectConverters.IsNotNull}}"
+                              x:CompileBindings="False">
+                        <TreeView.ItemTemplate>
+                            <TreeDataTemplate ItemsSource="{Binding Children}">
+                                <StackPanel Orientation="Horizontal" Spacing="6" Margin="2,1">
+                                    <TextBlock Text="{Binding DisplayId}" FontFamily="Consolas"
+                                               Foreground="{DynamicResource SemiColorSuccess}" FontSize="11" />
+                                    <TextBlock Text="{Binding TypeHex}" FontFamily="Consolas"
+                                               Foreground="{DynamicResource SemiColorText3}" FontSize="10" VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding Width, StringFormat='{}{0}'}" FontSize="10"
+                                               Foreground="{DynamicResource SemiColorText2}" VerticalAlignment="Center" />
+                                    <TextBlock Text="x" FontSize="10" Foreground="{DynamicResource SemiColorText3}" VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding Height, StringFormat='{}{0}'}" FontSize="10"
+                                               Foreground="{DynamicResource SemiColorText2}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </TreeDataTemplate>
+                        </TreeView.ItemTemplate>
+                    </TreeView>
+                </Panel>
+            </DockPanel>
+
+            <GridSplitter Grid.Column="3" Width="1" Background="{DynamicResource SemiColorBorder}" ResizeDirection="Columns" />
+
+            <Grid Grid.Column="4" RowDefinitions="*,1,*" Background="{DynamicResource SemiColorFill0}">
+
+                <Border Grid.Row="0">
+                    <Panel>
+                        <TextBlock Text="Select a layout from the list"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   Classes="editor-empty" Opacity="0.85"
+                                   IsVisible="{Binding SelectedDetail, Converter={x:Static conv:ObjectConverters.IsNull}}" />
+
+                        <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
+                                      IsVisible="{Binding SelectedDetail, Converter={x:Static conv:ObjectConverters.IsNotNull}}"
+                                      x:CompileBindings="False">
+                            <StackPanel Margin="10,6" Spacing="4">
+
+                                <TextBlock Classes="section-header" Text="Layout canvas" />
+                                <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                    <TextBlock Classes="prop-label" Text="Width" Width="48" />
+                                    <TextBox Text="{Binding SelectedDetail.LayoutWidthText}" Width="80" Classes="layout-hex" />
+                                    <TextBlock Classes="prop-label" Text="Height" Width="48" />
+                                    <TextBox Text="{Binding SelectedDetail.LayoutHeightText}" Width="80" Classes="layout-hex" />
+                                    <Button Classes="sm-btn" Content="Apply" Command="{Binding SelectedDetail.ApplyLayoutSizeCommand}" />
+                                </StackPanel>
+                                <TextBlock Text="Preview: drag inside the selection to move; drag corners or edges to resize (layout pixels, clamped to canvas)."
+                                           Classes="editor-hint" TextWrapping="Wrap" Margin="0,0,0,4" />
+
+                                <TextBlock Text="Select an element in the tree to edit geometry and textures."
+                                           HorizontalAlignment="Center"
+                                           Classes="editor-empty" Opacity="0.85" Margin="0,8,0,0"
+                                           IsVisible="{Binding SelectedDetail.SelectedElement, Converter={x:Static conv:ObjectConverters.IsNull}}" />
+
+                                <StackPanel Spacing="2"
+                                            IsVisible="{Binding SelectedDetail.SelectedElement, Converter={x:Static conv:ObjectConverters.IsNotNull}}">
+
+                                <StackPanel DataContext="{Binding SelectedDetail.SelectedElement}">
+                                <TextBlock Classes="section-header" Text="Identity" />
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <TextBlock Classes="prop-label" Text="Element ID" />
+                                    <TextBlock Classes="prop-value" Text="{Binding DisplayId}" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <TextBlock Classes="prop-label" Text="Type" />
+                                    <TextBlock Classes="prop-value" Text="{Binding TypeHex}" />
+                                </StackPanel>
+                                </StackPanel>
+
+                                <TextBlock Classes="section-header" Text="Position / Size (apply)" />
+                                <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                    <TextBlock Classes="prop-label" Text="X" Width="28" />
+                                    <TextBox Text="{Binding SelectedDetail.ElementGeomXText}" Width="56" Classes="layout-hex" />
+                                    <TextBlock Classes="prop-label" Text="Y" Width="28" />
+                                    <TextBox Text="{Binding SelectedDetail.ElementGeomYText}" Width="56" Classes="layout-hex" />
+                                    <TextBlock Classes="prop-label" Text="W" Width="28" />
+                                    <TextBox Text="{Binding SelectedDetail.ElementGeomWidthText}" Width="56" Classes="layout-hex" />
+                                    <TextBlock Classes="prop-label" Text="H" Width="28" />
+                                    <TextBox Text="{Binding SelectedDetail.ElementGeomHeightText}" Width="56" Classes="layout-hex" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="0,2,0,0">
+                                    <TextBlock Classes="prop-label" Text="Z" Width="28" />
+                                    <TextBox Text="{Binding SelectedDetail.ElementGeomZText}" Width="56" Classes="layout-hex" />
+                                    <TextBlock Classes="prop-label" Text="Read order" Width="72" />
+                                    <TextBox Text="{Binding SelectedDetail.ElementReadOrderText}" Width="56" Classes="layout-hex" />
+                                    <Button Classes="sm-btn" Content="Apply geometry" Command="{Binding SelectedDetail.ApplyElementGeometryCommand}"
+                                            Margin="8,0,0,0" />
+                                </StackPanel>
+
+                                <TextBlock Classes="section-header" Text="Edges (anchors)" />
+                                <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                    <TextBlock Classes="prop-label" Text="L" Width="28" />
+                                    <TextBox Text="{Binding SelectedDetail.ElementGeomLeftText}" Width="48" Classes="layout-hex" />
+                                    <TextBlock Classes="prop-label" Text="T" Width="28" />
+                                    <TextBox Text="{Binding SelectedDetail.ElementGeomTopText}" Width="48" Classes="layout-hex" />
+                                    <TextBlock Classes="prop-label" Text="R" Width="28" />
+                                    <TextBox Text="{Binding SelectedDetail.ElementGeomRightText}" Width="48" Classes="layout-hex" />
+                                    <TextBlock Classes="prop-label" Text="B" Width="28" />
+                                    <TextBox Text="{Binding SelectedDetail.ElementGeomBottomText}" Width="48" Classes="layout-hex" />
+                                </StackPanel>
+
+                                <TextBlock Classes="section-header" Text="Textures / media" />
+                                <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                    <TextBlock Classes="prop-label" Text="Primary image" Width="100" />
+                                    <TextBox Text="{Binding SelectedDetail.PrimarySurfaceHexText}" MinWidth="120" Classes="layout-hex"
+                                             Watermark="0x06001234" />
+                                    <Button Classes="sm-btn" Content="Apply" Command="{Binding SelectedDetail.ApplyPrimarySurfaceCommand}" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="0,2,0,0">
+                                    <TextBlock Classes="prop-label" Text="Add template image" Width="100" />
+                                    <TextBox Text="{Binding SelectedDetail.NewTemplateImageHexText}" MinWidth="120" Classes="layout-hex"
+                                             Watermark="0x06001234" />
+                                    <Button Classes="sm-btn" Content="Add" Command="{Binding SelectedDetail.AddTemplateImageCommand}" />
+                                </StackPanel>
+                                <TextBlock Text="Hex: Apply sets the primary image id; Add appends template media."
+                                           Classes="editor-hint" TextWrapping="Wrap" Margin="0,0,0,4" />
+
+                                <TextBlock Classes="section-header" Text="Inheritance" />
+                                <StackPanel DataContext="{Binding SelectedDetail.SelectedElement}">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <TextBlock Classes="prop-label" Text="Base Layout" />
+                                    <TextBlock Classes="prop-value" Text="{Binding BaseLayoutHex}" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <TextBlock Classes="prop-label" Text="Base Element" />
+                                    <TextBlock Classes="prop-value" Text="{Binding BaseElement}" />
+                                </StackPanel>
+
+                                <TextBlock Classes="section-header" Text="UI states &amp; media" />
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <TextBlock Classes="prop-label" Text="Default UIState" />
+                                    <TextBlock Classes="prop-value" Text="{Binding DefaultStateHex}" />
+                                </StackPanel>
+                                <TextBlock Text="Template row + one row per state. Image surface is the first MediaDescImage in that state."
+                                           Classes="editor-hint" TextWrapping="Wrap" Margin="0,0,0,6" />
+                                <ItemsControl ItemsSource="{Binding StateRows}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:LayoutStateRow">
+                                            <Border Classes="editor-panel" Padding="8,6" Margin="0,0,0,6">
+                                                <StackPanel Spacing="4">
+                                                    <TextBlock Text="{Binding RowLabel}" FontWeight="SemiBold" FontSize="11"
+                                                               Foreground="{DynamicResource SemiColorSuccess}" />
+                                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                                        <TextBlock Classes="prop-label" Text="State id" Width="72" />
+                                                        <TextBlock Classes="prop-value" Text="{Binding StateRecordIdHex}" />
+                                                    </StackPanel>
+                                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                                        <TextBlock Classes="prop-label" Text="Image surface" Width="72" />
+                                                        <TextBlock Classes="prop-value" Text="{Binding FirstImageSurfaceDisplay}" />
+                                                    </StackPanel>
+                                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                                        <TextBlock Classes="prop-label" Text="Media" Width="72" />
+                                                        <TextBlock Classes="prop-value" Text="{Binding MediaSummary}"
+                                                                   TextWrapping="Wrap" />
+                                                    </StackPanel>
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <TextBlock Classes="section-header" Text="Contents" />
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <TextBlock Classes="prop-label" Text="Children" />
+                                    <TextBlock Classes="prop-value" Text="{Binding ChildrenCount}" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <TextBlock Classes="prop-label" Text="States" />
+                                    <TextBlock Classes="prop-value" Text="{Binding StatesCount}" />
+                                </StackPanel>
+                                </StackPanel>
+                                </StackPanel>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Panel>
+                </Border>
+
+                <GridSplitter Grid.Row="1" Height="1" Background="{DynamicResource SemiColorBorder}"
+                              ResizeDirection="Rows" HorizontalAlignment="Stretch" />
+
+                <Border Grid.Row="2" Background="{DynamicResource SemiColorFill0}"
+                        BorderBrush="{DynamicResource SemiColorBorder}" BorderThickness="0,0,0,0">
+                    <DockPanel>
+                        <Border DockPanel.Dock="Top" Background="{DynamicResource SemiColorFill0}" Padding="8,6"
+                                BorderBrush="{DynamicResource SemiColorBorder}" BorderThickness="0,0,0,1">
+                            <TextBlock Text="Visual Preview" Classes="panel-caption" />
+                        </Border>
+                        <vm:LayoutPreviewCanvas x:Name="PreviewCanvas" />
+                    </DockPanel>
+                </Border>
+            </Grid>
+        </Grid>
+    </DockPanel>
+</UserControl>

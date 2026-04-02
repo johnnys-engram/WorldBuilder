@@ -168,6 +168,20 @@ namespace WorldBuilder.Shared.Services {
                         }
                     }
 
+                    progress?.Report(new DatExportProgress("Writing UI layout overrides...", 0.94f));
+                    var layoutRentResult =
+                        await _documentManager.RentDocumentAsync<LayoutDatDocument>(LayoutDatDocument.DocumentId, null,
+                            CancellationToken.None);
+                    if (layoutRentResult.IsSuccess) {
+                        try {
+                            await layoutRentResult.Value.Document.SaveToDatsAsync(exportDatWriter, portalIteration,
+                                cellIteration, null);
+                        }
+                        finally {
+                            layoutRentResult.Value.Dispose();
+                        }
+                    }
+
                     if (projectRegions.Count == 0 && totalAffectedLandblocks == 0) {
                         _log.LogInformation("No modified regions found for terrain export.");
                         progress?.Report(new DatExportProgress("Terrain: no modified regions; portal overrides written if any.", 0.96f));

@@ -1,0 +1,29 @@
+[
+  {
+    "id": "ace-generic",
+    "title": "Generic object",
+    "description": "Pickable item. Includes Setup, Icon, physics, appraisal basics.",
+    "weenieType": 1,
+    "ints": [
+      { "type": 1, "value": 128 },
+      { "type": 5, "value": 100 },
+      { "type": 8, "value": 100 },
+      { "type": 16, "value": 1 },
+      { "type": 19, "value": 100 },
+      { "type": 65, "value": 101 },
+      { "type": 93, "value": 1044 },
+      { "type": 174, "value": 1 }
+    ],
+    "bools": [
+      { "type": 22, "value": true }
+    ],
+    "strings": [
+      { "type": 1, "value": "New Object" },
+      { "type": 16, "value": "" }
+    ],
+    "dataIds": [
+      { "type": 1, "value": "0x02000001" },
+      { "type": 8, "value": "0x06001036" }
+    ]
+  }
+]

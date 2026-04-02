@@ -9,143 +9,29 @@
              x:DataType="vm:SkillEditorViewModel">
 
     <UserControl.Styles>
-        <Style Selector="TextBlock.section-header">
-            <Setter Property="FontSize" Value="15" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Foreground" Value="#f0e8ff" />
-            <Setter Property="Margin" Value="0,14,0,6" />
-        </Style>
-        <Style Selector="TextBlock.field-label">
-            <Setter Property="FontSize" Value="12" />
-            <Setter Property="Foreground" Value="#d4c8ec" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="Width" Value="120" />
-        </Style>
-        <Style Selector="TextBox.field-input">
-            <Setter Property="FontSize" Value="13" />
-            <Setter Property="MinHeight" Value="30" />
-            <Setter Property="Padding" Value="8,4" />
-            <Setter Property="Foreground" Value="#faf8ff" />
-            <Setter Property="Background" Value="#2d2548" />
-            <Setter Property="BorderBrush" Value="#5c4d7a" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CaretBrush" Value="#ffffff" />
-            <Setter Property="SelectionBrush" Value="#6b5594" />
-            <Setter Property="SelectionForegroundBrush" Value="#ffffff" />
-        </Style>
-        <Style Selector="TextBox.search-box">
-            <Setter Property="FontSize" Value="13" />
-            <Setter Property="MinHeight" Value="30" />
-            <Setter Property="Padding" Value="8,4" />
-            <Setter Property="Foreground" Value="#faf8ff" />
-            <Setter Property="Background" Value="#2d2548" />
-            <Setter Property="BorderBrush" Value="#5c4d7a" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CaretBrush" Value="#ffffff" />
-            <Setter Property="SelectionBrush" Value="#6b5594" />
-            <Setter Property="SelectionForegroundBrush" Value="#ffffff" />
-        </Style>
-        <Style Selector="ComboBox.field-input">
-            <Setter Property="FontSize" Value="13" />
-            <Setter Property="MinHeight" Value="30" />
-            <Setter Property="Foreground" Value="#faf8ff" />
-            <Setter Property="PlaceholderForeground" Value="#b0a0cc" />
-            <Setter Property="Background" Value="#2d2548" />
-            <Setter Property="BorderBrush" Value="#5c4d7a" />
-            <Setter Property="BorderThickness" Value="1" />
-        </Style>
-        <Style Selector="ComboBoxItem">
-            <Setter Property="Foreground" Value="#f5f2ff" />
-            <Setter Property="Background" Value="#2a2242" />
-        </Style>
-        <Style Selector="ComboBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="#453665" />
-        </Style>
-        <Style Selector="ComboBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="#55467a" />
-        </Style>
-        <Style Selector="Button.toolbar-btn">
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Padding" Value="10,6" />
-            <Setter Property="FontSize" Value="12" />
-            <Setter Property="MinWidth" Value="0" />
-            <Setter Property="Focusable" Value="False" />
-            <Setter Property="CornerRadius" Value="4" />
-            <Setter Property="Foreground" Value="#d8cce8" />
-        </Style>
-        <Style Selector="Button.toolbar-btn:pointerover /template/ ContentPresenter">
-            <Setter Property="Background" Value="#33ffffff" />
-            <Setter Property="Foreground" Value="#e0d8ef" />
-        </Style>
-        <Style Selector="TextBlock.help-icon">
-            <Setter Property="Text" Value="?" />
-            <Setter Property="FontSize" Value="12" />
-            <Setter Property="Foreground" Value="#e8dcff" />
-            <Setter Property="Background" Value="#3d2d58" />
-            <Setter Property="Padding" Value="6,2" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="Margin" Value="6,0,0,0" />
-        </Style>
-        <Style Selector="Button.sm-btn">
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="BorderBrush" Value="#5c4d7a" />
-            <Setter Property="Padding" Value="6,2" />
-            <Setter Property="FontSize" Value="12" />
-            <Setter Property="MinWidth" Value="0" />
-            <Setter Property="MinHeight" Value="0" />
-            <Setter Property="CornerRadius" Value="3" />
-            <Setter Property="Foreground" Value="#ddd0f0" />
-        </Style>
-        <Style Selector="Button.sm-btn:pointerover /template/ ContentPresenter">
-            <Setter Property="Background" Value="#33ffffff" />
-            <Setter Property="Foreground" Value="#e0d8ef" />
-        </Style>
-        <Style Selector="ListBox">
-            <Setter Property="Foreground" Value="#f0e8ff" />
-        </Style>
-        <Style Selector="ListBox ListBoxItem">
-            <Setter Property="Padding" Value="2,4" />
-            <Setter Property="Foreground" Value="#f0e8ff" />
-        </Style>
-        <Style Selector="ListBox ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="#4a3d8a" />
-        </Style>
-        <Style Selector="ListBox ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="#3d3368" />
-        </Style>
-        <Style Selector="ListBox ListBoxItem:selected TextBlock">
-            <Setter Property="Foreground" Value="#ffffff" />
-        </Style>
-        <Style Selector="ListBox ListBoxItem:pointerover TextBlock">
-            <Setter Property="Foreground" Value="#ffffff" />
-        </Style>
-        <Style Selector="CheckBox">
-            <Setter Property="Foreground" Value="#e8e0f8" />
-        </Style>
+        <StyleInclude Source="avares://WorldBuilder/Themes/EditorModuleStyles.axaml" />
     </UserControl.Styles>
 
     <DockPanel>
-        <Border DockPanel.Dock="Top" Background="#120c22" BorderBrush="#2a1d42" BorderThickness="0,0,0,1" Padding="4,2">
+        <Border DockPanel.Dock="Top" Classes="module-toolbar">
             <DockPanel>
                 <StackPanel Orientation="Horizontal" Spacing="4" DockPanel.Dock="Left">
-                    <Button Classes="toolbar-btn" Content="Save Skill" Command="{Binding SaveSkillCommand}" Foreground="#6ec07a" IsEnabled="{Binding IsSkillEditingEnabled}" />
+                    <Button Classes="toolbar-btn" Content="Save Skill" Command="{Binding SaveSkillCommand}" Foreground="{DynamicResource SemiColorSuccess}" IsEnabled="{Binding IsSkillEditingEnabled}" />
                     <Button Classes="toolbar-btn" Content="+ New Skill" Command="{Binding AddSkillCommand}" IsEnabled="{Binding IsSkillEditingEnabled}" />
-                    <Button Classes="toolbar-btn" Content="Delete Skill" Command="{Binding DeleteSkillCommand}" Foreground="#c45858" IsEnabled="{Binding IsSkillEditingEnabled}" />
-                    <Border Width="1" Background="#2a1d42" Margin="4,2" />
-                    <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" FontSize="12" Foreground="#a89bbe" />
+                    <Button Classes="toolbar-btn" Content="Delete Skill" Command="{Binding DeleteSkillCommand}" Foreground="{DynamicResource SemiColorDanger}" IsEnabled="{Binding IsSkillEditingEnabled}" />
+                    <Border Classes="module-chrome-split" />
+                    <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource SemiColorText2}" />
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Spacing="8" DockPanel.Dock="Right" HorizontalAlignment="Right">
-                    <TextBlock Text="{Binding FilteredSkillCount, StringFormat='Showing {0}'}" VerticalAlignment="Center" FontSize="12" Foreground="#8a7a9e" />
-                    <TextBlock Text="{Binding TotalSkillCount, StringFormat='of {0} skills'}" VerticalAlignment="Center" FontSize="12" Foreground="#8a7a9e" />
+                    <TextBlock Text="{Binding FilteredSkillCount, StringFormat='Showing {0}'}" VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource SemiColorText2}" />
+                    <TextBlock Text="{Binding TotalSkillCount, StringFormat='of {0} skills'}" VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource SemiColorText2}" />
                 </StackPanel>
             </DockPanel>
         </Border>
 
         <Grid ColumnDefinitions="300,1,*">
-            <DockPanel Grid.Column="0" Background="#1a1030">
-                <Border DockPanel.Dock="Top" Background="#120c22" Padding="8,6" BorderBrush="#2a1d42" BorderThickness="0,0,0,1">
+            <DockPanel Grid.Column="0" Background="{DynamicResource SemiColorBackground0}">
+                <Border DockPanel.Dock="Top" Background="{DynamicResource SemiColorFill0}" Padding="8,6" BorderBrush="{DynamicResource SemiColorBorder}" BorderThickness="0,0,0,1">
                     <StackPanel Spacing="6">
                         <TextBox Text="{Binding SearchText}" Watermark="Search skills by name..." Classes="search-box" />
                         <DockPanel>
@@ -154,17 +40,17 @@
                         </DockPanel>
                     </StackPanel>
                 </Border>
-                <ListBox ItemsSource="{Binding Skills}" SelectedItem="{Binding SelectedSkill}" Background="Transparent" FontSize="12">
+                <ListBox ItemsSource="{Binding Skills}" SelectedItem="{Binding SelectedSkill}" FontSize="12" Classes="editor-listbox">
                     <ListBox.ItemTemplate>
                         <DataTemplate x:DataType="vm:SkillListItem">
                             <DockPanel Margin="6,3">
-                                <TextBlock DockPanel.Dock="Right" Text="{Binding Category}" FontSize="11" Foreground="#8a7a9e" VerticalAlignment="Center" Margin="8,0,0,0" />
+                                <TextBlock DockPanel.Dock="Right" Text="{Binding Category}" Classes="editor-list-meta" VerticalAlignment="Center" Margin="8,0,0,0" />
                                 <StackPanel>
-                                    <TextBlock Text="{Binding Name}" Foreground="#e0d8ef" FontSize="14" />
+                                    <TextBlock Text="{Binding Name}" Foreground="{DynamicResource SemiColorText0}" FontSize="14" FontWeight="SemiBold" />
                                     <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <TextBlock Text="{Binding IdHex}" FontSize="11" Foreground="#8a7a9e" />
-                                        <TextBlock Text="{Binding TrainedCost, StringFormat='Train: {0}'}" FontSize="11" Foreground="#8a7a9e" />
-                                        <TextBlock Text="{Binding SpecializedCost, StringFormat='Spec: {0}'}" FontSize="11" Foreground="#8a7a9e" />
+                                        <TextBlock Text="{Binding IdHex}" Classes="editor-list-meta" />
+                                        <TextBlock Text="{Binding TrainedCost, StringFormat='Train: {0}'}" Classes="editor-list-meta" />
+                                        <TextBlock Text="{Binding SpecializedCost, StringFormat='Spec: {0}'}" Classes="editor-list-meta" />
                                     </StackPanel>
                                 </StackPanel>
                             </DockPanel>
@@ -173,13 +59,13 @@
                 </ListBox>
             </DockPanel>
 
-            <GridSplitter Grid.Column="1" Width="1" Background="#2a1d42" ResizeDirection="Columns" />
+            <GridSplitter Grid.Column="1" Width="1" Background="{DynamicResource SemiColorBorder}" ResizeDirection="Columns" />
 
-            <Border Grid.Column="2" Background="#1a1030">
+            <Border Grid.Column="2" Background="{DynamicResource SemiColorFill0}">
                 <Panel>
                     <TextBlock Text="Select a skill from the list to view its details"
                                HorizontalAlignment="Center" VerticalAlignment="Center"
-                               FontSize="14" Foreground="#8a7a9e" Opacity="0.6"
+                               Classes="editor-empty" Opacity="0.85"
                                IsVisible="{Binding SelectedDetail, Converter={x:Static conv:ObjectConverters.IsNull}}" />
 
                     <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
@@ -192,8 +78,8 @@
                             <TextBlock Classes="section-header" Text="Identity" />
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <StackPanel Spacing="4">
-                                    <Border Width="48" Height="48" Background="#221840" CornerRadius="4"
-                                            BorderBrush="#2a1d42" BorderThickness="1">
+                                    <Border Width="48" Height="48" Background="{DynamicResource SemiColorFill1}" CornerRadius="4"
+                                            BorderBrush="{DynamicResource SemiColorBorder}" BorderThickness="1">
                                         <Image Source="{Binding IconBitmap}" Width="48" Height="48" Stretch="Uniform" />
                                     </Border>
                                     <Button Classes="sm-btn" Content="Browse…"
@@ -203,7 +89,7 @@
                                 <StackPanel Spacing="4" VerticalAlignment="Top">
                                     <StackPanel Orientation="Horizontal" Spacing="4">
                                         <TextBlock Classes="field-label" Text="Skill ID" Width="90" />
-                                        <TextBlock Text="{Binding SkillId}" FontSize="13" Foreground="#b0a0c8" VerticalAlignment="Center" />
+                                        <TextBlock Text="{Binding SkillId}" FontSize="13" Foreground="{DynamicResource SemiColorText1}" VerticalAlignment="Center" />
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal" Spacing="4">
                                         <TextBlock Classes="field-label" Text="Icon ID" Width="90" />
@@ -214,13 +100,13 @@
                             </StackPanel>
 
                             <Border IsVisible="{Binding IsIconPickerOpen}"
-                                    Background="#221840" CornerRadius="6" Padding="8"
-                                    BorderBrush="#3a2d52" BorderThickness="1"
+                                    Background="{DynamicResource SemiColorFill1}" CornerRadius="6" Padding="8"
+                                    BorderBrush="{DynamicResource SemiColorBorder}" BorderThickness="1"
                                     MaxHeight="220" Margin="0,4">
                                 <DockPanel>
                                     <StackPanel DockPanel.Dock="Top" Margin="0,0,0,6" Spacing="4">
-                                        <TextBlock Text="Pick an icon:" FontSize="11" Foreground="#b0a0c8" />
-                                        <TextBlock Text="{Binding IconPickerSummary}" FontSize="10" Foreground="#8a7a9e"
+                                        <TextBlock Text="Pick an icon:" FontSize="11" Foreground="{DynamicResource SemiColorText1}" />
+                                        <TextBlock Text="{Binding IconPickerSummary}" FontSize="10" Foreground="{DynamicResource SemiColorText2}"
                                                    TextWrapping="Wrap" />
                                     </StackPanel>
                                     <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
@@ -232,7 +118,7 @@
                                             </ItemsControl.ItemsPanel>
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
-                                                    <Button Background="Transparent" BorderThickness="1" BorderBrush="#2a1d42"
+                                                    <Button Background="Transparent" BorderThickness="1" BorderBrush="{DynamicResource SemiColorBorder}"
                                                             CornerRadius="3" Padding="2" Margin="2"
                                                             Command="{Binding PickIconFromParentCommand}"
                                                             CommandParameter="{Binding}"
@@ -240,7 +126,7 @@
                                                         <Panel Width="32" Height="32">
                                                             <Image Source="{Binding Bitmap}" Width="32" Height="32" Stretch="Uniform"
                                                                    IsVisible="{Binding Bitmap, Converter={x:Static conv:ObjectConverters.IsNotNull}}" />
-                                                            <TextBlock Text="{Binding IdHex}" FontSize="9" Foreground="#b0a0c8"
+                                                            <TextBlock Text="{Binding IdHex}" FontSize="9" Foreground="{DynamicResource SemiColorText1}"
                                                                        VerticalAlignment="Center" HorizontalAlignment="Center"
                                                                        TextWrapping="Wrap"
                                                                        IsVisible="{Binding Bitmap, Converter={x:Static conv:ObjectConverters.IsNull}}" />
@@ -310,8 +196,8 @@
                             </StackPanel>
 
                             <TextBlock Classes="section-header" Text="Formula" />
-                            <Border Background="#221840" CornerRadius="6" Padding="12,8" Margin="0,4"
-                                    BorderBrush="#2a1d42" BorderThickness="1">
+                            <Border Background="{DynamicResource SemiColorFill1}" CornerRadius="6" Padding="12,8" Margin="0,4"
+                                    BorderBrush="{DynamicResource SemiColorBorder}" BorderThickness="1">
                                 <StackPanel Spacing="4">
                                     <StackPanel Orientation="Horizontal" Spacing="4">
                                         <TextBlock Classes="field-label" Text="Use Formula" />

@@ -259,7 +259,9 @@ namespace WorldBuilder.Services {
             var wb = new WriteableBitmap(new Avalonia.PixelSize(width, height), new Avalonia.Vector(96, 96), Avalonia.Platform.PixelFormat.Rgba8888, Avalonia.Platform.AlphaFormat.Unpremul);
 
             using (var locked = wb.Lock()) {
-                Marshal.Copy(pixelData, 0, locked.Address, pixelData.Length);
+                int maxBytes = checked(locked.RowBytes * height);
+                int copyLen = Math.Min(pixelData.Length, maxBytes);
+                Marshal.Copy(pixelData, 0, locked.Address, copyLen);
             }
 
             return wb;

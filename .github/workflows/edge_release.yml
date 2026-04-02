@@ -123,7 +123,7 @@ jobs:
         run: dotnet publish WorldBuilder.Windows/WorldBuilder.Windows.csproj -c Release -r win-${{ matrix.arch }} -o publish -p:SelfContained=true -p:DebugType=None -p:DebugSymbols=false -p:GenerateDocumentationFile=false -p:InformationalVersion=${{ steps.gitversion.outputs.informationalVersion }} -p:Version=${{ steps.gitversion.outputs.semVer }} -p:AssemblyVersion=${{ steps.gitversion.outputs.assemblySemVer }}
 
       - name: Pack
-        run: dotnet vpk pack -u WorldBuilder -v ${{ steps.gitversion.outputs.semVer }} -p publish -e WorldBuilder.Windows.exe --framework net10.0-${{ matrix.arch }}-desktop --channel ${{ matrix.channel }}
+        run: dotnet vpk pack -u WorldBuilder -v ${{ steps.gitversion.outputs.semVer }} -p publish -e WorldBuilder.Windows.exe --framework net9.0-${{ matrix.arch }}-desktop --channel ${{ matrix.channel }}
 
       - name: List Releases
         run: ls -la Releases/

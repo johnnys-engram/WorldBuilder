@@ -1,0 +1,27 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:WorldBuilder.Modules.ObjectDebug"
+             x:Class="WorldBuilder.Modules.ObjectDebug.ObjectDebugView"
+             x:DataType="vm:ObjectDebugViewModel">
+    <UserControl.Styles>
+        <StyleInclude Source="avares://WorldBuilder/Themes/EditorModuleStyles.axaml" />
+    </UserControl.Styles>
+    <DockPanel>
+        <Border DockPanel.Dock="Top" Classes="module-toolbar">
+            <TextBlock Text="Object debug"
+                       VerticalAlignment="Center"
+                       FontSize="12"
+                       Foreground="{DynamicResource SemiColorText1}"
+                       FontWeight="SemiBold" />
+        </Border>
+        <ScrollViewer Background="{DynamicResource SemiColorBackground0}"
+                      HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto">
+            <TextBlock Text="{Binding StatusText}"
+                       TextWrapping="Wrap"
+                       Margin="24,16"
+                       Classes="editor-hint"
+                       FontSize="13" />
+        </ScrollViewer>
+    </DockPanel>
+</UserControl>

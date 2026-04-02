@@ -40,6 +40,11 @@ namespace WorldBuilder.Views {
         private bool _renderIsPointerOver = false;
         private bool _renderIsEffectivelyVisible = false;
 
+        /// <summary>
+        /// Lazy init must run on the OpenGL thread (same as <see cref="OnGlRender"/>), not the UI thread.
+        /// </summary>
+        private volatile bool _sceneInitPending;
+
         public override DebugRenderSettings RenderSettings => new DebugRenderSettings();
 
         public static readonly StyledProperty<uint> FileIdProperty =
@@ -274,9 +279,10 @@ namespace WorldBuilder.Views {
                     await Dispatcher.UIThread.InvokeAsync(() => {
                         if (ct.IsCancellationRequested || !_renderIsEffectivelyVisible) return;
 
-                        if (_scene == null && _gl != null && Renderer != null) {
-                            InitializeScene();
-                            _scene?.Resize((int)Bounds.Width, (int)Bounds.Height);
+                        // Scene creation uses GL (BaseObjectRenderManager ctor); must run on the GL render thread.
+                        if (_scene == null && _gl != null && Renderer != null && _renderDats != null) {
+                            _sceneInitPending = true;
+                            RequestRender();
                         }
 
                         if (_scene != null && _renderFileId != 0) {
@@ -293,8 +299,23 @@ namespace WorldBuilder.Views {
             }, ct);
         }
 
+        private void TryCompleteDeferredSceneInit() {
+            if (!_sceneInitPending || _scene != null || _gl == null || Renderer == null || _renderDats == null) {
+                if (_scene != null)
+                    _sceneInitPending = false;
+                return;
+            }
+
+            _sceneInitPending = false;
+            InitializeScene();
+            _scene?.Resize((int)Bounds.Width, (int)Bounds.Height);
+            if (_renderFileId != 0) {
+                _ = _scene?.LoadObjectAsync(_renderFileId, _renderIsSetup);
+            }
+        }
+
         private void InitializeScene() {
-            if (_gl == null || Renderer == null) return;
+            if (_gl == null || Renderer == null || _scene != null) return;
 
             var loggerFactory = WorldBuilder.App.Services?.GetService<ILoggerFactory>() ?? LoggerFactory.Create(builder => {
                 builder.AddProvider(new ColorConsoleLoggerProvider());
@@ -328,6 +349,8 @@ namespace WorldBuilder.Views {
         protected override void OnGlRender(double frameTime) {
             if (!_renderIsEffectivelyVisible) return;
 
+            TryCompleteDeferredSceneInit();
+
             if (_scene == null) {
                 // Trigger lazy load if visible
                 UpdateObject();
@@ -355,6 +378,8 @@ namespace WorldBuilder.Views {
             _loadCts?.Cancel();
             _loadCts?.Dispose();
             _loadCts = null;
+
+            _sceneInitPending = false;
 
             // Dispose the scene to free GPU resources
             _scene?.Dispose();

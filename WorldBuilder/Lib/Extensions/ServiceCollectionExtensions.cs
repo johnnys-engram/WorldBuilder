@@ -198,10 +198,25 @@ namespace WorldBuilder.Lib.Extensions {
             collection.AddSingleton<WorldBuilder.Modules.Landscape.LandscapeViewModel>();
             collection.AddSingleton<WorldBuilder.Modules.Spell.SpellEditorViewModel>();
             collection.AddSingleton<WorldBuilder.Modules.Skill.SkillEditorViewModel>();
+            collection.AddSingleton<WorldBuilder.Modules.SpellSet.SpellSetEditorViewModel>();
+            collection.AddSingleton<WorldBuilder.Modules.Experience.ExperienceEditorViewModel>();
+            collection.AddSingleton<WorldBuilder.Modules.Vital.VitalEditorViewModel>();
+            collection.AddSingleton<WorldBuilder.Modules.Layout.LayoutEditorViewModel>();
+            collection.AddSingleton<WorldBuilder.Modules.Weenie.WeenieEditorViewModel>();
+            collection.AddSingleton<WorldBuilder.Modules.CharGen.CharGenEditorViewModel>();
+            collection.AddSingleton<WorldBuilder.Modules.ObjectDebug.ObjectDebugViewModel>();
+            // Tool tabs: Landscape + Dat browser first; all editors next; Object debug last (Editors menu order).
             collection.AddSingleton<IToolModule, WorldBuilder.Modules.Landscape.LandscapeModule>();
             collection.AddSingleton<IToolModule, WorldBuilder.Modules.DatBrowser.DatBrowserModule>();
             collection.AddSingleton<IToolModule, WorldBuilder.Modules.Spell.SpellEditorModule>();
             collection.AddSingleton<IToolModule, WorldBuilder.Modules.Skill.SkillEditorModule>();
+            collection.AddSingleton<IToolModule, WorldBuilder.Modules.SpellSet.SpellSetEditorModule>();
+            collection.AddSingleton<IToolModule, WorldBuilder.Modules.Experience.ExperienceEditorModule>();
+            collection.AddSingleton<IToolModule, WorldBuilder.Modules.Vital.VitalEditorModule>();
+            collection.AddSingleton<IToolModule, WorldBuilder.Modules.Layout.LayoutEditorModule>();
+            collection.AddSingleton<IToolModule, WorldBuilder.Modules.Weenie.WeenieEditorModule>();
+            collection.AddSingleton<IToolModule, WorldBuilder.Modules.CharGen.CharGenEditorModule>();
+            collection.AddSingleton<IToolModule, WorldBuilder.Modules.ObjectDebug.ObjectDebugModule>();
 
             collection.AddSingleton<TextureService>();
             collection.AddSingleton<MeshManagerService>();

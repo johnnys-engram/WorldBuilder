@@ -1,0 +1,243 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:WorldBuilder.Modules.CharGen"
+             xmlns:conv="using:WorldBuilder.Converters"
+             mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
+             x:Class="WorldBuilder.Modules.CharGen.CharGenEditorView"
+             x:DataType="vm:CharGenEditorViewModel">
+
+    <UserControl.Styles>
+        <StyleInclude Source="avares://WorldBuilder/Themes/EditorModuleStyles.axaml" />
+        <Style Selector="TextBlock.field-label">
+            <Setter Property="MinWidth" Value="140" />
+        </Style>
+    </UserControl.Styles>
+
+    <DockPanel>
+        <Border DockPanel.Dock="Top" Classes="module-toolbar">
+            <DockPanel>
+                <StackPanel Orientation="Horizontal" Spacing="4" DockPanel.Dock="Left">
+                    <Button Classes="toolbar-btn" Content="Save" Command="{Binding SaveCommand}" Foreground="{DynamicResource SemiColorSuccess}" IsEnabled="{Binding IsCharGenEditingEnabled}" />
+                    <Border Classes="module-chrome-split" />
+                    <Button Classes="toolbar-btn" Content="+ Heritage" Command="{Binding AddHeritageCommand}" IsEnabled="{Binding IsCharGenEditingEnabled}" />
+                    <Button Classes="toolbar-btn" Content="Delete Heritage" Command="{Binding RemoveHeritageCommand}" Foreground="{DynamicResource SemiColorDanger}" IsEnabled="{Binding IsCharGenEditingEnabled}" />
+                    <Border Classes="module-chrome-split" />
+                    <Button Classes="toolbar-btn" Content="+ Starting Area" Command="{Binding AddStartingAreaCommand}" IsEnabled="{Binding IsCharGenEditingEnabled}" />
+                    <Border Classes="module-chrome-split" />
+                    <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource SemiColorText2}" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <Grid ColumnDefinitions="320,1,*">
+            <DockPanel Grid.Column="0" Background="{DynamicResource SemiColorBackground0}">
+                <Border DockPanel.Dock="Bottom" Background="{DynamicResource SemiColorFill0}" Padding="8,6"
+                        BorderBrush="{DynamicResource SemiColorBorder}" BorderThickness="0,1,0,0" MaxHeight="250">
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Top" Text="Starting Areas" Classes="section-header" Margin="0,0,0,4" />
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <ItemsControl x:Name="StartingAreasList" ItemsSource="{Binding StartingAreas}"
+                                          x:CompileBindings="False">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Background="{DynamicResource SemiColorFill1}" CornerRadius="4" Padding="6,4" Margin="0,2"
+                                                BorderBrush="{DynamicResource SemiColorBorder}" BorderThickness="1">
+                                            <StackPanel Spacing="2">
+                                                <DockPanel>
+                                                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4">
+                                                        <TextBlock Text="{Binding LocationCount, StringFormat='{}{0} locs'}"
+                                                                   FontSize="11" Foreground="{DynamicResource SemiColorText2}" VerticalAlignment="Center" />
+                                                        <Button Classes="sm-btn" Content="+ Loc" FontSize="10"
+                                                                Command="{Binding AddLocationCommand}"
+                                                                ToolTip.Tip="Add a spawn location" />
+                                                        <Button Classes="sm-btn" Content="X" Foreground="{DynamicResource SemiColorDanger}"
+                                                                Command="{Binding $parent[UserControl].DataContext.RemoveStartingAreaCommand}"
+                                                                CommandParameter="{Binding}"
+                                                                ToolTip.Tip="Remove this starting area" />
+                                                    </StackPanel>
+                                                    <TextBox Text="{Binding Name}" FontSize="12" Foreground="{DynamicResource SemiColorText0}"
+                                                             Background="Transparent" BorderThickness="0"
+                                                             Padding="0" MinHeight="20" />
+                                                </DockPanel>
+                                                <ItemsControl ItemsSource="{Binding Locations}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <StackPanel Orientation="Horizontal" Spacing="4" Margin="8,1,0,1">
+                                                                <TextBox Text="{Binding CellId}" Width="80" FontSize="11"
+                                                                         Padding="3,1" MinHeight="20"
+                                                                         ToolTip.Tip="Landcell ID (hex)" />
+                                                                <TextBox Text="{Binding X}" Width="55" FontSize="11"
+                                                                         Padding="3,1" MinHeight="20"
+                                                                         ToolTip.Tip="X position" />
+                                                                <TextBox Text="{Binding Y}" Width="55" FontSize="11"
+                                                                         Padding="3,1" MinHeight="20"
+                                                                         ToolTip.Tip="Y position" />
+                                                                <TextBox Text="{Binding Z}" Width="55" FontSize="11"
+                                                                         Padding="3,1" MinHeight="20"
+                                                                         ToolTip.Tip="Z position" />
+                                                            </StackPanel>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </DockPanel>
+                </Border>
+
+                <DockPanel>
+                    <Border DockPanel.Dock="Top" Background="{DynamicResource SemiColorFill0}" Padding="8,6"
+                            BorderBrush="{DynamicResource SemiColorBorder}" BorderThickness="0,0,0,1">
+                        <TextBlock Text="Heritage Groups" Classes="panel-caption" />
+                    </Border>
+                    <ListBox ItemsSource="{Binding HeritageGroups}"
+                             SelectedItem="{Binding SelectedHeritage}"
+                             FontSize="12" Classes="editor-listbox">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate DataType="vm:HeritageListItem">
+                                <DockPanel Margin="4,2">
+                                    <TextBlock DockPanel.Dock="Right" Text="{Binding IdHex}"
+                                               Classes="editor-list-meta" VerticalAlignment="Center" Margin="8,0,0,0" />
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Name}" Foreground="{DynamicResource SemiColorText0}" FontSize="12" FontWeight="SemiBold" />
+                                        <StackPanel Orientation="Horizontal" Spacing="12">
+                                            <TextBlock Text="{Binding AttributeCredits, StringFormat='Attr: {0}'}"
+                                                       Classes="editor-list-meta" />
+                                            <TextBlock Text="{Binding SkillCredits, StringFormat='Skill: {0}'}"
+                                                       Classes="editor-list-meta" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </DockPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+            </DockPanel>
+
+            <GridSplitter Grid.Column="1" Width="1" Background="{DynamicResource SemiColorBorder}" ResizeDirection="Columns" />
+
+            <Grid Grid.Column="2" RowDefinitions="*,1,160">
+                <Border Grid.Row="0" Background="{DynamicResource SemiColorFill0}">
+                    <Panel>
+                        <TextBlock Text="Select a heritage group from the list to view its details"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   Classes="editor-empty" Opacity="0.85"
+                                   IsVisible="{Binding SelectedDetail, Converter={x:Static conv:ObjectConverters.IsNull}}" />
+
+                        <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
+                                      IsVisible="{Binding SelectedDetail, Converter={x:Static conv:ObjectConverters.IsNotNull}}">
+                            <StackPanel Margin="16,8,16,16" Spacing="4"
+                                        x:CompileBindings="False"
+                                        x:Name="DetailPanel"
+                                        DataContext="{Binding SelectedDetail}">
+
+                                <TextBlock Text="{Binding Name, StringFormat='Heritage: {0}'}"
+                                           FontSize="18" FontWeight="Bold" Foreground="{DynamicResource SemiColorText0}" Margin="0,8,0,4" />
+
+                                <TextBlock Classes="section-header" Text="Identity" />
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <StackPanel Spacing="4">
+                                        <Border Width="48" Height="48" Background="{DynamicResource SemiColorFill1}" CornerRadius="4"
+                                                BorderBrush="{DynamicResource SemiColorBorder}" BorderThickness="1">
+                                            <Image Source="{Binding IconBitmap}" Width="48" Height="48" Stretch="Uniform" />
+                                        </Border>
+                                        <Button Classes="sm-btn" Content="Browse..."
+                                                Command="{Binding ToggleIconPickerCommand}"
+                                                HorizontalAlignment="Center" />
+                                    </StackPanel>
+                                    <StackPanel Spacing="4" VerticalAlignment="Top">
+                                        <StackPanel Orientation="Horizontal" Spacing="4">
+                                            <TextBlock Classes="field-label" Text="Heritage ID" Width="100" />
+                                            <TextBlock Text="{Binding HeritageId, StringFormat='0x{0:X2}'}"
+                                                       FontSize="12" Foreground="{DynamicResource SemiColorText0}" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                        <StackPanel Orientation="Horizontal" Spacing="4">
+                                            <TextBlock Classes="field-label" Text="Icon ID" Width="100" />
+                                            <TextBox Classes="field-input" Text="{Binding IconId}" Width="120" />
+                                            <TextBlock Classes="help-icon" ToolTip.Tip="DataID for the heritage icon (0x06xxxxxx range)." />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <Border IsVisible="{Binding IsIconPickerOpen}"
+                                        Background="{DynamicResource SemiColorFill1}" CornerRadius="6" Padding="8"
+                                        BorderBrush="{DynamicResource SemiColorBorder}" BorderThickness="1"
+                                        MaxHeight="220" Margin="0,4">
+                                    <DockPanel>
+                                        <TextBlock DockPanel.Dock="Top" Text="Pick an icon:" FontSize="11" Foreground="{DynamicResource SemiColorText1}" Margin="0,0,0,6" />
+                                        <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                                            <ItemsControl ItemsSource="{Binding AvailableIcons}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <WrapPanel />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Button Background="Transparent" BorderThickness="1" BorderBrush="{DynamicResource SemiColorBorder}"
+                                                                CornerRadius="3" Padding="2" Margin="2"
+                                                                Command="{Binding #DetailPanel.DataContext.PickIconCommand}"
+                                                                CommandParameter="{Binding}"
+                                                                ToolTip.Tip="{Binding IdHex}">
+                                                            <Image Source="{Binding Bitmap}" Width="32" Height="32" Stretch="Uniform" />
+                                                        </Button>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </ScrollViewer>
+                                    </DockPanel>
+                                </Border>
+
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <TextBlock Classes="field-label" Text="Name" />
+                                    <TextBox Classes="field-input" Text="{Binding Name}" Width="250" />
+                                </StackPanel>
+
+                                <TextBlock Classes="section-header" Text="Credits" />
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <TextBlock Classes="field-label" Text="Attribute Credits" />
+                                    <TextBox Classes="field-input" Text="{Binding AttributeCredits}" Width="100" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <TextBlock Classes="field-label" Text="Skill Credits" />
+                                    <TextBox Classes="field-input" Text="{Binding SkillCredits}" Width="100" />
+                                </StackPanel>
+
+                                <TextBlock Classes="section-header" Text="Models" />
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <TextBlock Classes="field-label" Text="Setup ID" />
+                                    <TextBox Classes="field-input" Text="{Binding SetupId}" Width="120" />
+                                    <TextBlock Text="{Binding SetupId, StringFormat='0x{0:X8}'}"
+                                               FontSize="11" Foreground="{DynamicResource SemiColorText2}" FontFamily="Consolas"
+                                               VerticalAlignment="Center" Margin="4,0,0,0" />
+                                </StackPanel>
+                                <TextBlock Text="{Binding SetupInfo}" FontSize="11" Foreground="{DynamicResource SemiColorText1}" Margin="140,0,0,0" />
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <TextBlock Classes="field-label" Text="Environment Setup" />
+                                    <TextBox Classes="field-input" Text="{Binding EnvironmentSetupId}" Width="120" />
+                                    <TextBlock Text="{Binding EnvironmentSetupId, StringFormat='0x{0:X8}'}"
+                                               FontSize="11" Foreground="{DynamicResource SemiColorText2}" FontFamily="Consolas"
+                                               VerticalAlignment="Center" Margin="4,0,0,0" />
+                                </StackPanel>
+                                <TextBlock Text="{Binding EnvSetupInfo}" FontSize="11" Foreground="{DynamicResource SemiColorText1}" Margin="140,0,0,0" />
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Panel>
+                </Border>
+
+                <GridSplitter Grid.Row="1" Height="1" Background="{DynamicResource SemiColorBorder}"
+                              ResizeDirection="Rows" HorizontalAlignment="Stretch" />
+
+                <Border Grid.Row="2" Background="{DynamicResource SemiColorFill0}" BorderBrush="{DynamicResource SemiColorBorder}" BorderThickness="0,1,0,0" Padding="12">
+                    <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SemiColorText2}"
+                               Text="Object browser with thumbnails and live 3D heritage preview are not wired in this build. Edit Setup ID and Environment Setup ID above; full preview will use the Object Debug / landscape GL stack when integrated." />
+                </Border>
+            </Grid>
+        </Grid>
+    </DockPanel>
+</UserControl>

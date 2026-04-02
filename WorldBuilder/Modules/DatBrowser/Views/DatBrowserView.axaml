@@ -11,6 +11,7 @@
              xmlns:mainComponents="using:WorldBuilder.Views.Components"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
              x:Class="WorldBuilder.Modules.DatBrowser.Views.DatBrowserView"
+             x:Name="DatBrowserRoot"
              x:DataType="vm:DatBrowserViewModel">
     <UserControl.Resources>
         <StreamGeometry x:Key="WarningIcon">M12,2L1,21H23L12,2M12,6L19.53,19H4.47L12,6M11,10V14H13V10H11M11,16V18H13V16H11Z</StreamGeometry>
@@ -66,11 +67,7 @@
     </UserControl.DataTemplates>
 
     <UserControl.Styles>
-        <Style Selector="TabItem">
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="MinHeight" Value="24"/>
-            <Setter Property="Padding" Value="8,0"/>
-        </Style>
+        <StyleInclude Source="avares://WorldBuilder/Themes/EditorModuleStyles.axaml" />
         <!-- Shared overview styles, used by SurfaceTextureOverviewView and EnvCellOverviewView -->
         <Style Selector="ListBoxItem">
             <Setter Property="Padding" Value="5"/>
@@ -91,36 +88,38 @@
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
     </UserControl.Styles>
-    
-    <Grid ColumnDefinitions="*, Auto, 400">
-        <Grid Grid.Column="0" RowDefinitions="Auto, *">
-            <Grid Grid.Row="0" ColumnDefinitions="*, Auto">
-                <StackPanel Grid.Column="0" Orientation="Horizontal">
-                    <ComboBox ItemsSource="{Binding DatTypes}" 
-                              SelectedItem="{Binding SelectedType}"
-                              HorizontalAlignment="Stretch" 
-                              MinWidth="200"
-                              Margin="5"/>
-                    <Button Content="Browse" 
-                            Command="{Binding BrowseCommand}" 
-                            IsVisible="{Binding CanBrowse}"
-                            VerticalAlignment="Center" 
-                            Margin="5"/>
-                </StackPanel>
 
-                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="5" Margin="5" VerticalAlignment="Center" IsVisible="{Binding IsSearchVisible}">
+    <DockPanel>
+        <Border DockPanel.Dock="Top" Classes="module-toolbar">
+            <Grid ColumnDefinitions="*, Auto">
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <ComboBox ItemsSource="{Binding DatTypes}"
+                              SelectedItem="{Binding SelectedType}"
+                              HorizontalAlignment="Stretch"
+                              MinWidth="200"
+                              MaxWidth="420"
+                              Classes="field-input" />
+                    <Button Content="Browse"
+                            Command="{Binding BrowseCommand}"
+                            IsVisible="{Binding CanBrowse}"
+                            VerticalAlignment="Center"
+                            Classes="toolbar-btn" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" Margin="12,0,0,0" VerticalAlignment="Center" IsVisible="{Binding IsSearchVisible}">
                     <mainComponents:KeywordsSearchControl DataContext="{Binding}" />
                 </StackPanel>
             </Grid>
-            
-            <ContentControl Grid.Row="1" Content="{Binding CurrentBrowser}" />
-        </Grid>
+        </Border>
 
-        <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Stretch" 
+        <Grid ColumnDefinitions="*, Auto, 400" Background="{DynamicResource SemiColorBackground0}">
+        <ContentControl Grid.Column="0" Content="{Binding CurrentBrowser}" />
+
+        <GridSplitter Grid.Column="1" Width="1" Background="{DynamicResource SemiColorBorder}" HorizontalAlignment="Stretch"
                       IsVisible="{Binding SelectedObject, Converter={x:Static conv:NumericConverters.IsNotZero}}" />
 
         <TabControl Grid.Column="2" SelectedIndex="{Binding SelectedPropertiesTabIndex}"
-                    IsVisible="{Binding SelectedObject, Converter={x:Static conv:NumericConverters.IsNotZero}}" HorizontalAlignment="Stretch">
+                    IsVisible="{Binding SelectedObject, Converter={x:Static conv:NumericConverters.IsNotZero}}" HorizontalAlignment="Stretch"
+                    Classes="editor-tabs">
             <TabItem Header="Overview" IsVisible="{Binding ObjectOverview, Converter={x:Static ObjectConverters.IsNotNull}}">
                 <ContentControl Content="{Binding ObjectOverview}" />
             </TabItem>
@@ -197,40 +196,35 @@
                 <ScrollViewer>
                     <StackPanel Margin="10" Spacing="10">
                         <StackPanel Spacing="2">
-                            <TextBlock Text="Names" Foreground="{DynamicResource SemiColorText3}" FontSize="10" FontWeight="SemiBold" Margin="5,0"/>
-                            <TextBox Text="{Binding CurrentKeywordsNames}" 
-                                     IsReadOnly="True" 
-                                     TextWrapping="Wrap" 
-                                     BorderThickness="0"
-                                     Background="{DynamicResource SemiColorFill0}"
-                                     Padding="10"
-                                     CornerRadius="4"/>
+                            <TextBlock Text="Names" Classes="editor-hint" FontWeight="SemiBold" Margin="5,0"/>
+                            <TextBox Text="{Binding CurrentKeywordsNames}"
+                                     IsReadOnly="True"
+                                     TextWrapping="Wrap"
+                                     Classes="field-input"
+                                     Padding="10" />
                         </StackPanel>
 
                         <StackPanel Spacing="2">
-                            <TextBlock Text="Tags" Foreground="{DynamicResource SemiColorText3}" FontSize="10" FontWeight="SemiBold" Margin="5,0"/>
-                            <TextBox Text="{Binding CurrentKeywordsTags}" 
-                                     IsReadOnly="True" 
-                                     TextWrapping="Wrap" 
-                                     BorderThickness="0"
-                                     Background="{DynamicResource SemiColorFill0}"
-                                     Padding="10"
-                                     CornerRadius="4"/>
+                            <TextBlock Text="Tags" Classes="editor-hint" FontWeight="SemiBold" Margin="5,0"/>
+                            <TextBox Text="{Binding CurrentKeywordsTags}"
+                                     IsReadOnly="True"
+                                     TextWrapping="Wrap"
+                                     Classes="field-input"
+                                     Padding="10" />
                         </StackPanel>
                         
                         <StackPanel Spacing="2">
-                            <TextBlock Text="Descriptions" Foreground="{DynamicResource SemiColorText3}" FontSize="10" FontWeight="SemiBold" Margin="5,0"/>
-                            <TextBox Text="{Binding CurrentKeywordsDescriptions}" 
-                                     IsReadOnly="True" 
-                                     TextWrapping="Wrap" 
-                                     BorderThickness="0"
-                                     Background="{DynamicResource SemiColorFill0}"
-                                     Padding="10"
-                                     CornerRadius="4"/>
+                            <TextBlock Text="Descriptions" Classes="editor-hint" FontWeight="SemiBold" Margin="5,0"/>
+                            <TextBox Text="{Binding CurrentKeywordsDescriptions}"
+                                     IsReadOnly="True"
+                                     TextWrapping="Wrap"
+                                     Classes="field-input"
+                                     Padding="10" />
                         </StackPanel>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
         </TabControl>
-    </Grid>
+        </Grid>
+    </DockPanel>
 </UserControl>

@@ -167,7 +167,7 @@ public partial class PortalDatDocument : BaseDocument {
             VitalTable t => writer.TrySave(t, iteration),
             SkillTable t => writer.TrySave(t, iteration),
             ExperienceTable t => writer.TrySave(t, iteration),
-            CharGen t => writer.TrySave(t, iteration),
+            global::DatReaderWriter.DBObjs.CharGen t => writer.TrySave(t, iteration),
             GfxObj t => writer.TrySave(t, iteration),
             Setup t => writer.TrySave(t, iteration),
             _ => false
@@ -181,7 +181,7 @@ public partial class PortalDatDocument : BaseDocument {
                 nameof(VitalTable) => UnpackAndSave<VitalTable>(writer, entry.Data, iteration),
                 nameof(SkillTable) => UnpackAndSave<SkillTable>(writer, entry.Data, iteration),
                 nameof(ExperienceTable) => UnpackAndSave<ExperienceTable>(writer, entry.Data, iteration),
-                nameof(CharGen) => UnpackAndSave<CharGen>(writer, entry.Data, iteration),
+                nameof(global::DatReaderWriter.DBObjs.CharGen) => UnpackAndSave<global::DatReaderWriter.DBObjs.CharGen>(writer, entry.Data, iteration),
                 nameof(GfxObj) => UnpackAndSave<GfxObj>(writer, entry.Data, iteration),
                 nameof(Setup) => UnpackAndSave<Setup>(writer, entry.Data, iteration),
                 _ => false

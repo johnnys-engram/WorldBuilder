@@ -6,6 +6,9 @@
 
 	<ItemGroup>
 		<AvaloniaResource Include="Assets\**" />
+		<EmbeddedResource Include="Data\WeenieTemplates.json">
+			<CopyToOutputDirectory>Never</CopyToOutputDirectory>
+		</EmbeddedResource>
 	</ItemGroup>
 
 	<ItemGroup>

@@ -1,4 +1,4 @@
-﻿using Avalonia;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -135,7 +135,30 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IRecipient<Open
 
     public ObservableCollection<ToolTabViewModel> ToolTabs { get; } = new();
 
+    /// <summary>Name of the currently selected tool module (shown next to the menu bar).</summary>
+    public string SelectedEditorDisplayName => ToolTabs.FirstOrDefault(t => t.IsSelected)?.Name ?? "";
+
+    /// <summary>Currently active editor tab; bound to the main window editor switcher.</summary>
+    public ToolTabViewModel? SelectedToolTab {
+        get => ToolTabs.FirstOrDefault(t => t.IsSelected);
+        set {
+            if (value is not null)
+                ApplyToolTabSelection(value);
+        }
+    }
+
     public string ExitHotkeyText => RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? "Cmd+Q" : "Alt+F4";
+
+    [RelayCommand]
+    private void SelectToolTab(ToolTabViewModel? tab) => ApplyToolTabSelection(tab);
+
+    private void ApplyToolTabSelection(ToolTabViewModel? tab) {
+        if (tab == null) return;
+        foreach (var t in ToolTabs)
+            t.IsSelected = ReferenceEquals(t, tab);
+        OnPropertyChanged(nameof(SelectedEditorDisplayName));
+        OnPropertyChanged(nameof(SelectedToolTab));
+    }
 
     [Microsoft.Extensions.DependencyInjection.ActivatorUtilitiesConstructor]
     [UnconditionalSuppressMessage("Trimming", "IL2026")]
@@ -160,6 +183,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable, IRecipient<Open
         if (ToolTabs.Count > 0) {
             ToolTabs[0].IsSelected = true;
         }
+
+        OnPropertyChanged(nameof(SelectedEditorDisplayName));
+        OnPropertyChanged(nameof(SelectedToolTab));
 
         _themeService.PropertyChanged += OnThemeServicePropertyChanged;
 
