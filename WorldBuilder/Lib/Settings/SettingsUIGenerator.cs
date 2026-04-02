@@ -4,6 +4,7 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Data;
 using Avalonia.Layout;
 using Avalonia.Media;
+using HanumanInstitute.MvvmDialogs;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
 using System;
@@ -12,8 +13,11 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Numerics;
 using System.Reflection;
+using System.Text;
+using WorldBuilder.Lib;
 using WorldBuilder.Lib.Converters;
 using WorldBuilder.ViewModels;
+using WorldBuilder.Shared.Lib.AceDb;
 using WorldBuilder.Shared.Services;
 using WorldBuilder.Shared.Lib.Settings;
 
@@ -114,6 +118,10 @@ namespace WorldBuilder.Lib.Settings {
             // Add property controls
             var categoryInstance = GetCategoryInstance(category.Type);
             if (categoryInstance != null) {
+                if (categoryInstance is AceWorldDatabaseSettings aceWorldTop) {
+                    stackPanel.Children.Add(CreateAceWorldActionButtons(aceWorldTop));
+                }
+
                 foreach (var property in category.Properties) {
                     var control = GeneratePropertyControl(property, categoryInstance);
                     if (control != null) {
@@ -353,6 +361,128 @@ namespace WorldBuilder.Lib.Settings {
             defaultTextBox.Bind(TextBox.TextProperty,
                 new Binding { Source = instance, Path = bindingPath, Mode = BindingMode.TwoWay });
             return defaultTextBox;
+        }
+
+        private Control CreateAceWorldActionButtons(AceWorldDatabaseSettings aceWorld) {
+            var row = new StackPanel {
+                Orientation = Orientation.Horizontal,
+                Spacing = 8,
+                Margin = new Thickness(0, 4, 0, 0)
+            };
+
+            var testBtn = new Button { Content = "Test" };
+            testBtn.Click += async (_, _) => {
+                testBtn.IsEnabled = false;
+                try {
+                    var connector = new AceDbConnector(aceWorld.ToAceDbSettings());
+                    var error = await connector.TestConnectionAsync();
+                    var dlg = App.Services?.GetService<IDialogService>();
+                    if (dlg != null) {
+                        if (error == null)
+                            await dlg.ShowMessageBoxAsync(null, "Connection successful!", "ACE MySQL");
+                        else
+                            await dlg.ShowMessageBoxAsync(null, $"Connection failed:\n{error}", "ACE MySQL");
+                    }
+                }
+                finally {
+                    testBtn.IsEnabled = true;
+                }
+            };
+
+            var connectBtn = new Button { Content = "Connect" };
+            connectBtn.Click += async (_, _) => {
+                connectBtn.IsEnabled = false;
+                try {
+                    var connector = new AceDbConnector(aceWorld.ToAceDbSettings());
+                    var dlg = App.Services?.GetService<IDialogService>();
+                    if (dlg == null) return;
+
+                    var encounters = await connector.GetEncountersAsync(5);
+                    if (encounters.Count == 0) {
+                        await dlg.ShowMessageBoxAsync(null,
+                            "No rows returned from encounter table.\n\nEnsure Database = ace_world_release in settings.",
+                            "ACE MySQL");
+                        return;
+                    }
+
+                    var sb = new StringBuilder();
+
+                    // ── Table 1: encounters ──────────────────────────────────────────
+                    sb.AppendLine($"Database: {aceWorld.Database}");
+                    sb.AppendLine();
+                    sb.AppendLine("[ encounter ]");
+                    sb.AppendLine($"{"Landblock",-12} {"WeenieId",-10} {"Name",-28} {"CellX",-7} CellY");
+                    sb.AppendLine(new string('-', 70));
+                    foreach (var r in encounters)
+                        sb.AppendLine($"0x{r.Landblock:X5}      {r.WeenieClassId,-10} {r.WeenieName,-28} {r.CellX,-7} {r.CellY}");
+
+                    // Table 2: weenie_properties_generator for first encounter
+                    var first = encounters[0];
+                    var generators = await connector.GetWeenieGeneratorsAsync(first.WeenieClassId, 2);
+
+                    sb.AppendLine();
+                    sb.AppendLine($"[ weenie_properties_generator  object_Id={first.WeenieClassId}  ({first.WeenieName}) ]");
+
+                    if (generators.Count == 0) {
+                        sb.AppendLine("  (no generator rows for this weenie)");
+                    }
+                    else {
+                        sb.AppendLine($"{"Prob",-6} {"SpawnId",-9} {"SpawnName",-28} {"Delay",-8} {"Init",-6} {"Max",-6} When");
+                        sb.AppendLine(new string('-', 70));
+                        foreach (var g in generators)
+                            sb.AppendLine($"{g.Probability,-6:F2} {g.SpawnWeenieClassId,-9} {g.SpawnWeenieName,-28} {g.Delay,-8:F0} {g.InitCreate,-6} {g.MaxCreate,-6} {g.WhenCreate}");
+                    }
+
+                    // Table 3: weenie_properties_d_i_d for the spawned mob
+                    var spawnId = generators.Count > 0
+                        ? generators[0].SpawnWeenieClassId
+                        : first.WeenieClassId;
+                    var spawnName = generators.Count > 0
+                        ? generators[0].SpawnWeenieName
+                        : first.WeenieName;
+
+                    var dids = await connector.GetWeenieDidsAsync(spawnId);
+
+                    sb.AppendLine();
+                    sb.AppendLine($"[ weenie_properties_d_i_d  object_Id={spawnId}  ({spawnName}) ]");
+
+                    if (dids.Count == 0) {
+                        sb.AppendLine("  (no DID rows for this weenie)");
+                    }
+                    else {
+                        sb.AppendLine($"{"Type",-6} {"Value (hex)",-14} Label");
+                        sb.AppendLine(new string('-', 50));
+                        foreach (var d in dids) {
+                            var label = d.Type switch {
+                                1  => "Setup",
+                                2  => "MotionTable",
+                                3  => "SoundTable",
+                                4  => "CombatTable",
+                                6  => "PaletteBase",
+                                7  => "ClothingBase",
+                                8  => "Icon",
+                                22 => "PhysicsEffectTable",
+                                _  => $"type {d.Type}"
+                            };
+                            sb.AppendLine($"{d.Type,-6} 0x{d.Value:X8}     {label}");
+                        }
+                    }
+
+                    await dlg.ShowMessageBoxAsync(null, sb.ToString(), "Encounter + Generator + DIDs");
+                }
+                catch (Exception ex) {
+                    var dlg = App.Services?.GetService<IDialogService>();
+                    if (dlg != null)
+                        await dlg.ShowMessageBoxAsync(null, $"Error: {ex.Message}", "ACE MySQL");
+                }
+                finally {
+                    connectBtn.IsEnabled = true;
+                }
+            };
+
+            row.Children.Add(testBtn);
+            row.Children.Add(connectBtn);
+            return row;
         }
     }
 }

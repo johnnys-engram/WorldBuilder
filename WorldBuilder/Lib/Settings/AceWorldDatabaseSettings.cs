@@ -12,8 +12,7 @@ namespace WorldBuilder.Lib.Settings {
 
         [SettingDescription("MySQL port")]
         [SettingOrder(1)]
-        [SettingRange(1, 65535, 1, 100)]
-        private int _port = 3306;
+        private int _port = 9000;
         public int Port { get => _port; set => SetProperty(ref _port, value); }
 
         [SettingDescription("Database name (usually ace_world)")]

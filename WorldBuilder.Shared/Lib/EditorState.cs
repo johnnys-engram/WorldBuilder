@@ -33,5 +33,8 @@ namespace WorldBuilder.Shared.Lib {
         [ObservableProperty] private float _mouseSensitivity = 1.0f;
         [ObservableProperty] private bool _altMouseLook = false;
         [ObservableProperty] private bool _enableCameraCollision = true;
+
+        /// <summary>Bright vertical markers in the 3D view at loaded ACE encounter positions.</summary>
+        [ObservableProperty] private bool _showEncounterBeacons;
     }
 }

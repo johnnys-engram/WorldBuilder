@@ -1,0 +1,17 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "WorldBuilder (Debug)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build: WorldBuilder (Debug)",
+      "program": "${workspaceFolder}/WorldBuilder.Windows/bin/Debug/net9.0/WorldBuilder.Windows.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/WorldBuilder.Windows",
+      "stopAtEntry": false,
+      "console": "internalConsole",
+      "justMyCode": true
+    }
+  ]
+}

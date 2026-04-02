@@ -99,6 +99,16 @@
           <Button Command="{Binding ResetCamera}" ToolTip.Tip="Reset Camera">
             <icons:MaterialIcon Kind="Target" />
           </Button>
+          <Button Command="{Binding SpawnEncounterAtCameraCommand}"
+                  IsVisible="{Binding !IsReadOnly}"
+                  ToolTip.Tip="Spawn first ACE encounter mob in front of camera">
+            <icons:MaterialIcon Kind="Ghost" />
+          </Button>
+          <Button Command="{Binding LoadAceEncountersCommand}"
+                  IsVisible="{Binding !IsReadOnly}"
+                  ToolTip.Tip="Load encounter mobs from ACE MySQL for nearby landblocks">
+            <icons:MaterialIcon Kind="DatabaseArrowDown" />
+          </Button>
         </StackPanel>
 
         <!-- Time of Day Overlay -->
@@ -133,13 +143,53 @@
 
         <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="10, 10, 10, 50" 
                 Background="#AA000000" BorderBrush="{DynamicResource SemiColorBorder}" BorderThickness="1"
-                CornerRadius="4" Padding="4" Width="208" Height="208">
-          <Panel>
-            <Image x:Name="MinimapImage" Width="200" Height="200" PointerPressed="OnMinimapPointerPressed" Cursor="Hand" />
-            
-            <Ellipse x:Name="MinimapPlayerIndicator" Width="8" Height="8" Fill="Red" 
-                     HorizontalAlignment="Left" VerticalAlignment="Top" IsHitTestVisible="False" />
-          </Panel>
+                CornerRadius="4" Padding="4" Width="208" MinHeight="232">
+          <Grid RowDefinitions="Auto,*">
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="2" Margin="0,0,0,4">
+              <StackPanel.Styles>
+                <Style Selector="Button, ToggleButton">
+                  <Setter Property="Focusable" Value="False" />
+                  <Setter Property="Padding" Value="2" />
+                  <Setter Property="Width" Value="28" />
+                  <Setter Property="Height" Value="24" />
+                  <Setter Property="HorizontalContentAlignment" Value="Center" />
+                  <Setter Property="VerticalContentAlignment" Value="Center" />
+                  <Setter Property="Background" Value="{DynamicResource SemiColorFill0}" />
+                  <Setter Property="BorderBrush" Value="{DynamicResource SemiColorBorder}" />
+                  <Setter Property="BorderThickness" Value="1" />
+                </Style>
+                <Style Selector="ToggleButton:checked /template/ ContentPresenter#PART_ContentPresenter">
+                  <Setter Property="Background" Value="{DynamicResource SemiColorPrimary}" />
+                  <Setter Property="Opacity" Value="0.85" />
+                </Style>
+              </StackPanel.Styles>
+              <Button Command="{Binding MinimapZoomOutCommand}" ToolTip.Tip="Minimap zoom out">
+                <icons:MaterialIcon Kind="ZoomOut" Width="16" Height="16" />
+              </Button>
+              <Button Command="{Binding MinimapZoomInCommand}" ToolTip.Tip="Minimap zoom in">
+                <icons:MaterialIcon Kind="ZoomIn" Width="16" Height="16" />
+              </Button>
+              <ToggleButton IsChecked="{Binding MinimapEncounterHighlight}" ToolTip.Tip="Larger encounter dots on minimap">
+                <icons:MaterialIcon Kind="Pin" Width="16" Height="16" />
+              </ToggleButton>
+              <ToggleButton IsChecked="{Binding EditorState.ShowEncounterBeacons, Mode=TwoWay}" ToolTip.Tip="Yellow vertical poles at encounter positions in 3D">
+                <icons:MaterialIcon Kind="ArrowUpBold" Width="16" Height="16" />
+              </ToggleButton>
+            </StackPanel>
+            <Panel Grid.Row="1" Width="200" Height="200">
+              <Image x:Name="MinimapImage" Width="200" Height="200" PointerPressed="OnMinimapPointerPressed" Cursor="Hand" />
+
+              <vm:MinimapEncounterOverlay x:Name="MinimapEncounterOverlay"
+                                          Width="200" Height="200"
+                                          Dots="{Binding EncounterMapDots}"
+                                          ZoomFactor="{Binding MinimapZoom}"
+                                          HighlightEncounters="{Binding MinimapEncounterHighlight}"
+                                          IsHitTestVisible="False" />
+
+              <Ellipse x:Name="MinimapPlayerIndicator" Width="8" Height="8" Fill="Red" 
+                       HorizontalAlignment="Left" VerticalAlignment="Top" IsHitTestVisible="False" />
+            </Panel>
+          </Grid>
         </Border>
       </Panel>
 

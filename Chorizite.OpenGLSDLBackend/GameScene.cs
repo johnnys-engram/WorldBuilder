@@ -635,6 +635,47 @@ public class GameScene : IDisposable {
         }
     }
 
+    /// <summary>
+    /// Returns the terrain surface height (world-space Z) at the given world XY position.
+    /// Returns 0 if the terrain chunk is not yet loaded.
+    /// </summary>
+    public float GetTerrainHeight(float worldX, float worldY) =>
+        _terrainManager?.GetHeight(worldX, worldY) ?? 0f;
+
+    /// <summary>
+    /// Stores encounter preview instances for a landblock. They are merged into the
+    /// renderer's instance list on every <c>GenerateForLandblockAsync</c> pass, making
+    /// them permanent without any document writes, undo entries, or race conditions.
+    /// Call <see cref="InvalidateEncounterLandblock"/> afterward to trigger a re-render
+    /// for landblocks that are already loaded.
+    /// </summary>
+    public void SetEncounterOverlay(ushort landblockId, System.Collections.Generic.IEnumerable<(ObjectId instanceId, uint modelId, Vector3 worldPos, Quaternion rotation, float scale)> entries) {
+        _staticObjectManager?.SetEncounterOverlay(landblockId, entries);
+    }
+
+    /// <summary>
+    /// Invalidates a single landblock so its <c>GenerateForLandblockAsync</c> re-runs and
+    /// picks up any encounter overlay that was set via <see cref="SetEncounterOverlay"/>.
+    /// </summary>
+    public void InvalidateEncounterLandblock(ushort landblockId) {
+        _staticObjectManager?.InvalidateLandblock(landblockId >> 8, landblockId & 0xFF);
+    }
+
+    /// <summary>Clears the encounter overlay for a single landblock.</summary>
+    public void ClearEncounterOverlay(ushort landblockId) {
+        _staticObjectManager?.ClearEncounterOverlay(landblockId);
+    }
+
+    /// <summary>Clears all encounter overlays.</summary>
+    public void ClearAllEncounterOverlays() {
+        if (_staticObjectManager == null) return;
+        _staticObjectManager.ClearAllEncounterOverlays();
+    }
+
+    /// <summary>Waits until the static-object renderer has generated instances for a landblock.</summary>
+    public Task WaitForLandblockInstancesAsync(ushort landblockId, CancellationToken ct = default) =>
+        _staticObjectManager?.WaitForInstancesAsync(landblockId, ct) ?? Task.CompletedTask;
+
     public uint GetEnvCellAt(Vector3 pos) {
         return _envCellManager?.GetEnvCellAt(pos) ?? 0;
     }
@@ -1056,9 +1097,10 @@ public class GameScene : IDisposable {
         // Pass 3: Selection Outlines
         RenderSelectionOutlines();
 
-        if (_state.ShowDebugShapes) {
+        if (_state.ShowDebugShapes || _state.ShowEncounterBeacons) {
             var debugSettings = new DebugRenderSettings {
                 ShowBoundingBoxes = false,
+                ShowEncounterBeacons = _state.ShowEncounterBeacons,
                 SelectVertices = false,
                 SelectBuildings = false,
                 SelectStaticObjects = false,
@@ -1068,7 +1110,7 @@ public class GameScene : IDisposable {
                 SelectPortals = false
             };
 
-            if (_activeTool is InspectorTool inspectorTool && inspectorTool.ShowBoundingBoxes) {
+            if (_activeTool is InspectorTool inspectorTool && inspectorTool.ShowBoundingBoxes && _state.ShowDebugShapes) {
                 debugSettings.ShowBoundingBoxes = true;
                 debugSettings.SelectVertices |= inspectorTool.SelectVertices;
                 debugSettings.SelectBuildings |= inspectorTool.SelectBuildings && _state.ShowBuildings;
@@ -1079,7 +1121,7 @@ public class GameScene : IDisposable {
                 debugSettings.SelectPortals |= inspectorTool.SelectPortals;
             }
 
-            if (_activeTool is ObjectManipulationTool manipulationTool && manipulationTool.ShowBoundingBoxes) {
+            if (_activeTool is ObjectManipulationTool manipulationTool && manipulationTool.ShowBoundingBoxes && _state.ShowDebugShapes) {
                 debugSettings.ShowBoundingBoxes = true;
                 debugSettings.SelectStaticObjects |= manipulationTool.SelectStaticObjects && _state.ShowStaticObjects;
                 debugSettings.SelectEnvCellStaticObjects |= manipulationTool.SelectEnvCellStaticObjects && _state.ShowEnvCells;

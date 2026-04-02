@@ -62,7 +62,9 @@ public partial class LayoutDatDocument : BaseDocument {
 
         try {
             var buffer = new byte[PackBufferSize];
-            var writer = new DatBinWriter(buffer.AsMemory());
+            var writer = _unpackContext != null
+                ? new DatBinWriter(buffer.AsMemory(), _unpackContext)
+                : new DatBinWriter(buffer.AsMemory());
             ((IPackable)layout).Pack(writer);
             Overlay.Entries[layoutId] = new LayoutDatEntry {
                 TypeName = nameof(LayoutDesc),
@@ -155,7 +157,9 @@ public partial class LayoutDatDocument : BaseDocument {
             if (!Overlay.Entries.TryGetValue(layoutId, out var entry)) continue;
             try {
                 var buffer = new byte[PackBufferSize];
-                var writer = new DatBinWriter(buffer.AsMemory());
+                var writer = _unpackContext != null
+                    ? new DatBinWriter(buffer.AsMemory(), _unpackContext)
+                    : new DatBinWriter(buffer.AsMemory());
                 live.Id = layoutId;
                 ((IPackable)live).Pack(writer);
                 entry.Data = buffer[..writer.Offset];

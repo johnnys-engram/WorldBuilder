@@ -26,6 +26,7 @@ public partial class LandscapeView : UserControl {
     private WorldBuilderSettings? _settings;
     private Avalonia.Controls.Image? _minimapImage;
     private Avalonia.Controls.Shapes.Ellipse? _minimapIndicator;
+    private MinimapEncounterOverlay? _minimapEncounterOverlay;
 
     // Setting Grid.Width at DesignTime causes the content in the right column to not stretch to greater widths
     // Setting Grid.MinWidth sets the starting width properly, but doesn't actually enforce a MinWidth constraint when dragging GridSplitter
@@ -60,6 +61,7 @@ public partial class LandscapeView : UserControl {
         _settings = WorldBuilder.App.Services?.GetService<WorldBuilderSettings>();
         _minimapImage = this.FindControl<Avalonia.Controls.Image>("MinimapImage");
         _minimapIndicator = this.FindControl<Avalonia.Controls.Shapes.Ellipse>("MinimapPlayerIndicator");
+        _minimapEncounterOverlay = this.FindControl<MinimapEncounterOverlay>("MinimapEncounterOverlay");
 
         if (_minimapIndicator != null) {
             _minimapIndicator.Margin = new Avalonia.Thickness(100 - 4, 100 - 4, 0, 0);
@@ -186,16 +188,20 @@ public partial class LandscapeView : UserControl {
     }
 
     private void OnUpdateTick(object? sender, EventArgs e) {
-        if (_locationText == null || _renderView?.Camera == null || _renderView.LandscapeDocument?.Region == null) return;
+        if (_renderView?.Camera == null || _renderView.LandscapeDocument?.Region == null) return;
 
-        var pos = _renderView.Camera.Position;
+        var pos    = _renderView.Camera.Position;
         var cellId = _renderView.GetEnvCellAt(pos);
-        var loc = Position.FromGlobal(pos, _renderView.LandscapeDocument.Region, cellId != 0 ? cellId : null);
-
+        var loc    = Position.FromGlobal(pos, _renderView.LandscapeDocument.Region, cellId != 0 ? cellId : null);
         loc.Rotation = _renderView.Camera.Rotation;
         _lastLocationString = loc.ToLandblockString();
 
-        _locationText.Text = loc.ToMapString() + $" | {_lastLocationString}";
+        if (_locationText != null)
+            _locationText.Text = loc.ToMapString() + $" | {_lastLocationString}";
+
+        // Keep encounter overlay in sync with the camera every tick (cheap — just a position update)
+        if (_minimapEncounterOverlay != null)
+            _minimapEncounterOverlay.CameraPosition = pos;
     }
 
     protected override void OnDataContextChanged(EventArgs e) {

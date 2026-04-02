@@ -14,6 +14,8 @@ namespace WorldBuilder.Shared.Models {
         public bool SelectPortals { get; set; } = true;
         public bool ShowDisqualifiedScenery { get; set; } = true;
         public bool EnableAnisotropicFiltering { get; set; } = true;
+        /// <summary>Vertical yellow poles at ACE encounter overlay positions (static objects).</summary>
+        public bool ShowEncounterBeacons { get; set; } = false;
 
         public Vector4 VertexColor { get; set; } = LandscapeColorsSettings.Instance.Vertex;
         public Vector4 BuildingColor { get; set; } = LandscapeColorsSettings.Instance.Building;

@@ -13,6 +13,7 @@ namespace WorldBuilder.Shared.Services {
     /// Default implementation of <see cref="IDatReaderWriter"/>, managing access to multiple dat files.
     /// </summary>
     public class DefaultDatReaderWriter : IDatReaderWriter {
+        private readonly DatCollection? _datCollection;
         private readonly Dictionary<uint, IDatDatabase> _cellRegions = [];
         private readonly Dictionary<uint, uint> _regionFileMap = [];
 
@@ -42,28 +43,50 @@ namespace WorldBuilder.Shared.Services {
 
         public DefaultDatReaderWriter(string datDirectory, DatAccessType accessType = DatAccessType.Read) {
             _datDirectory = datDirectory;
-            Portal = new DefaultDatDatabase(new PortalDatabase((options) => {
-                options.AccessType = accessType;
-                options.FilePath = Path.Combine(datDirectory, "client_portal.dat");
-                options.FileCachingStrategy = FileCachingStrategy.OnDemand;
-                options.IndexCachingStrategy = IndexCachingStrategy.OnDemand;
-            }));
 
-            Language = new DefaultDatDatabase(new LocalDatabase((options) => {
-                options.AccessType = accessType;
-                options.FilePath = Path.Combine(datDirectory, "client_local_English.dat");
-                options.FileCachingStrategy = FileCachingStrategy.OnDemand;
-                options.IndexCachingStrategy = IndexCachingStrategy.OnDemand;
-            }));
+            var cell1Path = Path.GetFullPath(Path.Combine(datDirectory, "client_cell_1.dat"));
+            if (File.Exists(cell1Path)) {
+                var collectionOptions = new DatCollectionOptions {
+                    DatDirectory = datDirectory,
+                    AccessType = accessType,
+                    FileCachingStrategy = FileCachingStrategy.OnDemand,
+                    IndexCachingStrategy = IndexCachingStrategy.OnDemand,
+                };
+                _datCollection = new DatCollection(collectionOptions);
+                Portal = new DefaultDatDatabase(_datCollection.Portal, disposeUnderlying: false);
+                Language = new DefaultDatDatabase(_datCollection.Local, disposeUnderlying: false);
+                HighRes = new DefaultDatDatabase(_datCollection.HighRes, disposeUnderlying: false);
 
-            HighRes = new DefaultDatDatabase(new PortalDatabase((options) => {
-                options.AccessType = accessType;
-                options.FilePath = Path.Combine(datDirectory, "client_highres.dat");
-                options.FileCachingStrategy = FileCachingStrategy.OnDemand;
-                options.IndexCachingStrategy = IndexCachingStrategy.OnDemand;
-            }));
+                var collectionCellPath = Path.GetFullPath(collectionOptions.CellDatPath);
+                AddCellRegions(datDirectory, accessType, collectionCellPath);
+            }
+            else {
+                Portal = new DefaultDatDatabase(new PortalDatabase((options) => {
+                    options.AccessType = accessType;
+                    options.FilePath = Path.Combine(datDirectory, "client_portal.dat");
+                    options.FileCachingStrategy = FileCachingStrategy.OnDemand;
+                    options.IndexCachingStrategy = IndexCachingStrategy.OnDemand;
+                }));
 
-            // Load all region cells
+                Language = new DefaultDatDatabase(new LocalDatabase((options) => {
+                    options.AccessType = accessType;
+                    options.FilePath = Path.Combine(datDirectory, "client_local_English.dat");
+                    options.FileCachingStrategy = FileCachingStrategy.OnDemand;
+                    options.IndexCachingStrategy = IndexCachingStrategy.OnDemand;
+                }));
+
+                HighRes = new DefaultDatDatabase(new PortalDatabase((options) => {
+                    options.AccessType = accessType;
+                    options.FilePath = Path.Combine(datDirectory, "client_highres.dat");
+                    options.FileCachingStrategy = FileCachingStrategy.OnDemand;
+                    options.IndexCachingStrategy = IndexCachingStrategy.OnDemand;
+                }));
+
+                AddCellRegions(datDirectory, accessType, collectionCellPath: null);
+            }
+        }
+
+        private void AddCellRegions(string datDirectory, DatAccessType accessType, string? collectionCellPath) {
             var regions = Portal.GetAllIdsOfType<Region>().ToList();
 
             foreach (var regionFileId in regions) {
@@ -73,18 +96,26 @@ namespace WorldBuilder.Shared.Services {
 
                 var regionId = region.RegionNumber;
 
-                var cellFilePath = Path.Combine(datDirectory, $"client_cell_{regionId}.dat");
+                var cellFilePath = Path.GetFullPath(Path.Combine(datDirectory, $"client_cell_{regionId}.dat"));
                 if (!File.Exists(cellFilePath)) {
                     continue;
                 }
 
-                var cell = new DefaultDatDatabase(new CellDatabase((options) => {
-                    options.AccessType = accessType;
-                    options.FilePath = cellFilePath;
-                    options.FileCachingStrategy = FileCachingStrategy.OnDemand;
-                    options.IndexCachingStrategy = IndexCachingStrategy.OnDemand;
-                }));
-                _cellRegions.Add(regionId, cell);
+                if (_datCollection != null
+                    && collectionCellPath != null
+                    && string.Equals(cellFilePath, collectionCellPath, StringComparison.OrdinalIgnoreCase)) {
+                    _cellRegions.Add(regionId, new DefaultDatDatabase(_datCollection.Cell, disposeUnderlying: false));
+                }
+                else {
+                    var cell = new DefaultDatDatabase(new CellDatabase((options) => {
+                        options.AccessType = accessType;
+                        options.FilePath = cellFilePath;
+                        options.FileCachingStrategy = FileCachingStrategy.OnDemand;
+                        options.IndexCachingStrategy = IndexCachingStrategy.OnDemand;
+                    }));
+                    _cellRegions.Add(regionId, cell);
+                }
+
                 _regionFileMap.Add(regionId, regionFileId);
             }
         }
@@ -144,14 +175,15 @@ namespace WorldBuilder.Shared.Services {
 
         /// <inheritdoc/>
         public void Dispose() {
-            Portal.Dispose();
-            Language.Dispose();
-            HighRes.Dispose();
             foreach (var cell in _cellRegions.Values) {
                 cell.Dispose();
             }
 
             _cellRegions.Clear();
+            Portal.Dispose();
+            Language.Dispose();
+            HighRes.Dispose();
+            _datCollection?.Dispose();
         }
     }
 
@@ -162,9 +194,11 @@ namespace WorldBuilder.Shared.Services {
         public DatDatabase Db { get; private set; }
         private readonly ConcurrentDictionary<(Type, uint), IDBObj> _objCache = new();
         private readonly object _lock = new();
+        private readonly bool _disposeUnderlying;
 
-        public DefaultDatDatabase(DatDatabase db) {
+        public DefaultDatDatabase(DatDatabase db, bool disposeUnderlying = true) {
             Db = db;
+            _disposeUnderlying = disposeUnderlying;
         }
 
         /// <inheritdoc/>
@@ -212,7 +246,9 @@ namespace WorldBuilder.Shared.Services {
         /// <inheritdoc/>
         public void Dispose() {
             _objCache.Clear();
-            Db.Dispose();
+            if (_disposeUnderlying) {
+                Db.Dispose();
+            }
         }
     }
 }

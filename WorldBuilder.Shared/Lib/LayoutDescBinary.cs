@@ -15,7 +15,7 @@ public static class LayoutDescBinary {
         ArgumentNullException.ThrowIfNull(unpackContext);
 
         var buffer = new byte[PackBufferSize];
-        var writer = new DatBinWriter(buffer.AsMemory());
+        var writer = new DatBinWriter(buffer.AsMemory(), unpackContext);
         ((IPackable)source).Pack(writer);
 
         var copy = new LayoutDesc();

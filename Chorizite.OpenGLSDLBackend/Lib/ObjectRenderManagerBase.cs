@@ -1100,7 +1100,14 @@ namespace Chorizite.OpenGLSDLBackend.Lib {
             }
 
             lb.GpuReady = true;
+            OnLandblockUploaded(GeometryUtils.PackKey(lb.GridX, lb.GridY));
         }
+
+        /// <summary>
+        /// Called after a landblock's GPU buffers are committed and <see cref="ObjectLandblock.GpuReady"/> is set.
+        /// Override in subclasses to perform post-upload work (e.g. signalling waiters).
+        /// </summary>
+        protected virtual void OnLandblockUploaded(ushort key) { }
 
         /// <summary>
         /// Lightweight transform-only re-upload. Rebuilds part groups and re-uploads

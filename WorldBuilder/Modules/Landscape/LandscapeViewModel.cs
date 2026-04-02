@@ -32,6 +32,7 @@ using WorldBuilder.Shared.Modules.Landscape.Lib;
 using WorldBuilder.Modules.Landscape.Lib;
 using WorldBuilder.Shared.Modules.Landscape.Services;
 using WorldBuilder.Shared.Services;
+using WorldBuilder.Shared.Lib.AceDb;
 using WorldBuilder.ViewModels;
 using ICamera = WorldBuilder.Shared.Models.ICamera;
 
@@ -77,7 +78,19 @@ public partial class LandscapeViewModel : ViewModelBase, ILandscapeRaycastServic
 
     [ObservableProperty] private bool _is3DCameraEnabled = true;
 
+    /// <summary>Minimap zoom: &gt;1 shows fewer world units (closer view). Default slightly zoomed in.</summary>
+    [ObservableProperty] private double _minimapZoom = 1.35;
+
+    /// <summary>Larger, brighter encounter dots on the minimap.</summary>
+    [ObservableProperty] private bool _minimapEncounterHighlight;
+
     [ObservableProperty] private Avalonia.Controls.GridLength _bottomPanelHeight = new Avalonia.Controls.GridLength(0);
+
+    [RelayCommand]
+    private void MinimapZoomIn() => MinimapZoom = Math.Min(6.0, MinimapZoom * 1.2);
+
+    [RelayCommand]
+    private void MinimapZoomOut() => MinimapZoom = Math.Max(0.55, MinimapZoom / 1.2);
 
     private void OnIsDebugShapesEnabledChanged(bool value) {
         EditorState.ShowDebugShapes = value;
@@ -110,6 +123,15 @@ public partial class LandscapeViewModel : ViewModelBase, ILandscapeRaycastServic
 
     private LandscapeToolContext? _toolContext;
     private WorldBuilder.Shared.Models.ICamera? _camera;
+
+    // ACE encounter incremental-loading state.
+    // SemaphoreSlim ensures only one load runs at a time (command + background tick share it).
+    private readonly SemaphoreSlim _encounterLoadLock = new(1, 1);
+    // Landblock IDs whose encounter overlay has been set on the renderer.
+    private readonly HashSet<ushort> _loadedEncounterLbIds = new();
+    // Per-landblock dot lists for the minimap.
+    private readonly Dictionary<ushort, List<EncounterMapDot>> _encounterDotsByLb = new();
+    private CancellationTokenSource? _encounterTickCts;
     public WorldBuilder.Shared.Models.ICamera? Camera {
         get => _gameScene?.CurrentCamera ?? _camera;
         set => _camera = value;
@@ -869,19 +891,243 @@ public partial class LandscapeViewModel : ViewModelBase, ILandscapeRaycastServic
 
     private async Task LoadLandscapeAsync() {
         try {
-            // Find the first region ID
             var regionId = _dats.CellRegions.Keys.OrderBy(k => k).FirstOrDefault();
-
-            var rental =
-                await _project.Landscape.GetOrCreateTerrainDocumentAsync(regionId, CancellationToken.None);
+            var rental = await _project.Landscape.GetOrCreateTerrainDocumentAsync(regionId, CancellationToken.None);
 
             await Dispatcher.UIThread.InvokeAsync(() => {
                 _landscapeRental = rental;
                 ActiveDocument = _landscapeRental.Document;
             });
+
+            // Auto-connect whenever a host is configured; warns in log on failure and keeps retrying.
+            var aceWorld = _settings.AceWorld;
+            if (aceWorld != null && !string.IsNullOrWhiteSpace(aceWorld.Host)) {
+                _ = Task.Run(() => LoadAceEncountersAsync(CancellationToken.None));
+            }
         }
         catch (Exception ex) {
             _log.LogError(ex, "Error loading landscape");
+        }
+    }
+
+    // In-memory encounter dots shown on the minimap — no document writes, no undo history.
+    [ObservableProperty]
+    private IReadOnlyList<EncounterMapDot>? _encounterMapDots;
+
+    [RelayCommand]
+    private async Task LoadAceEncountersAsync(CancellationToken ct = default) {
+        if (ActiveDocument == null) return;
+        await LoadAceEncountersInternalAsync(ct); // lock is inside; skips if already running
+    }
+
+    /// <summary>
+    /// Computes the set of landblock IDs that should be loaded around the current camera
+    /// using Manhattan distance so the shape is a diamond, not a circle or square.
+    /// </summary>
+    private HashSet<ushort> ComputeDesiredLandblockIds(ITerrainInfo region) {
+        var cameraPos  = Camera?.Position ?? Vector3.Zero;
+        var centerLbId = _landscapeObjectService.ComputeLandblockId(region, cameraPos);
+        int cX = (centerLbId >> 8) & 0xFF;
+        int cY =  centerLbId       & 0xFF;
+        const int radius = 2; // Manhattan distance — 13-LB diamond
+        var result = new HashSet<ushort>();
+        for (int dx = -radius; dx <= radius; dx++) {
+            for (int dy = -radius; dy <= radius; dy++) {
+                if (Math.Abs(dx) + Math.Abs(dy) > radius) continue;
+                int lbX = cX + dx, lbY = cY + dy;
+                if (lbX is >= 0 and <= 254 && lbY is >= 0 and <= 254)
+                    result.Add((ushort)((lbX << 8) | lbY));
+            }
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Incremental load: computes desired vs loaded landblock sets, queries only the diff,
+    /// clears only the departed ones. Never does a full clear — prevents creatures vanishing.
+    /// Guarded by a SemaphoreSlim so the tick and the manual command can't overlap.
+    /// </summary>
+    private async Task LoadAceEncountersInternalAsync(CancellationToken ct) {
+        if (!_encounterLoadLock.Wait(0)) return; // already running
+        try {
+            var region = ActiveDocument?.Region;
+            if (region == null) return;
+
+            var aceSettings = _settings.AceWorld?.ToAceDbSettings();
+            if (aceSettings == null || string.IsNullOrWhiteSpace(aceSettings.Host)) return;
+
+            var desiredLbs = ComputeDesiredLandblockIds(region);
+            var toLoad   = desiredLbs.Where(id => !_loadedEncounterLbIds.Contains(id)).ToList();
+            var toRemove = _loadedEncounterLbIds.Where(id => !desiredLbs.Contains(id)).ToList();
+
+            if (toLoad.Count == 0 && toRemove.Count == 0) return; // camera hasn't left current set
+
+            // --- Remove departed landblocks (no DB needed) ---
+            if (_gameScene != null) {
+                foreach (var lbId in toRemove) {
+                    _gameScene.ClearEncounterOverlay(lbId);
+                    _gameScene.InvalidateEncounterLandblock(lbId);
+                    _encounterDotsByLb.Remove(lbId);
+                }
+            }
+            foreach (var lbId in toRemove) _loadedEncounterLbIds.Remove(lbId);
+
+            // --- Load new landblocks ---
+            if (toLoad.Count > 0) {
+                // Connect once we know there's actual work to do
+                var connector  = new AceDbConnector(aceSettings);
+                var connError  = await connector.TestConnectionAsync(ct);
+                if (connError != null) {
+                    _log.LogWarning("[ACE Encounters] Cannot connect to {Host}: {Err}", aceSettings.Host, connError);
+                    // Don't mark toLoad as loaded — will retry next tick
+                    goto rebuildDots;
+                }
+
+                // Pre-mark as loaded so concurrent ticks don't double-query
+                foreach (var id in toLoad) _loadedEncounterLbIds.Add(id);
+
+                var spawns = await connector.GetEncounterSpawnsForAreaAsync(
+                    toLoad.Select(id => (int)id).ToList(), ct);
+
+                // Group by landblock
+                var byLb = new Dictionary<ushort, (List<EncounterMapDot> Dots, List<(ObjectId InstId, uint SetupDid, Vector3 XyPos, float Scale)> Entries)>();
+                for (int i = 0; i < spawns.Count; i++) {
+                    var spawn = spawns[i];
+                    var lbId  = (ushort)spawn.Landblock;
+                    var localX = Math.Clamp(spawn.CellX * 24f, 0.5f, 191.5f);
+                    var localY = Math.Clamp(spawn.CellY * 24f, 0.5f, 191.5f);
+                    var xyPos  = _landscapeObjectService.ComputeWorldPosition(region, lbId, new Vector3(localX, localY, 0f));
+
+                    if (!byLb.TryGetValue(lbId, out var lbData))
+                        byLb[lbId] = lbData = (new List<EncounterMapDot>(), new List<(ObjectId, uint, Vector3, float)>());
+
+                    lbData.Dots.Add(new EncounterMapDot(xyPos.X, xyPos.Y, IsGenerator: false, spawn.SpawnName));
+
+                    if (spawn.SetupDid == 0 || _gameScene == null) continue;
+                    var hash   = (uint)HashCode.Combine(spawn.Landblock, spawn.CellX, spawn.CellY);
+                    var instId = ObjectId.FromDat(ObjectType.StaticObject, 0, hash, (ushort)(i & 0xFFFF));
+                    lbData.Entries.Add((instId, spawn.SetupDid, xyPos, spawn.Scale));
+                }
+
+                // Push to renderer
+                if (_gameScene != null) {
+                    var scene = _gameScene;
+                    foreach (var kvp in byLb) {
+                        var lbId    = kvp.Key;
+                        var entries = kvp.Value.Entries.Select(s => {
+                            var z = scene.GetTerrainHeight(s.XyPos.X, s.XyPos.Y);
+                            return (s.InstId, s.SetupDid, new Vector3(s.XyPos.X, s.XyPos.Y, z), Quaternion.Identity, s.Scale);
+                        }).ToList();
+                        scene.SetEncounterOverlay(lbId, entries);
+                        scene.InvalidateEncounterLandblock(lbId);
+                        _encounterDotsByLb[lbId] = kvp.Value.Dots;
+                    }
+                }
+
+                _log.LogInformation("[ACE Encounters] +{Load} LBs / -{Remove} LBs | {Spawns} spawns",
+                    toLoad.Count, toRemove.Count, spawns.Count);
+            }
+
+            rebuildDots:
+            var allDots = _encounterDotsByLb.Values.SelectMany(d => d).ToList();
+            await Dispatcher.UIThread.InvokeAsync(() => EncounterMapDots = allDots);
+
+            EnsureEncounterTickRunning();
+        }
+        catch (OperationCanceledException) { /* shutdown */ }
+        catch (Exception ex) {
+            _log.LogDebug(ex, "[ACE Encounters] Tick error");
+        }
+        finally {
+            _encounterLoadLock.Release();
+        }
+    }
+
+    private void EnsureEncounterTickRunning() {
+        if (_encounterTickCts != null) return;
+        _encounterTickCts = new CancellationTokenSource();
+        var token = _encounterTickCts.Token;
+        _ = Task.Run(async () => {
+            while (!token.IsCancellationRequested) {
+                try {
+                    await Task.Delay(3_000, token); // 3-second tick
+                    await LoadAceEncountersInternalAsync(token);
+                }
+                catch (OperationCanceledException) { break; }
+                catch { /* keep ticking */ }
+            }
+        }, token);
+    }
+
+
+    [RelayCommand]
+    private async Task SpawnEncounterAtCameraAsync() {
+        if (IsReadOnly || ActiveDocument == null || Camera == null) {
+            _log.LogWarning("[Encounter Spawn] Cannot spawn: project is read-only or document/camera not ready");
+            return;
+        }
+
+        try {
+            var aceSettings = _settings.AceWorld.ToAceDbSettings();
+            var connector = new AceDbConnector(aceSettings);
+
+            // Step 1 – first encounter row
+            var encounters = await connector.GetEncountersAsync(1, CancellationToken.None);
+            if (encounters.Count == 0) {
+                _log.LogWarning("[Encounter Spawn] No encounters found in '{Db}'", aceSettings.Database);
+                return;
+            }
+            var enc = encounters[0];
+
+            // Step 2 – first generator row → actual spawned mob id
+            var generators = await connector.GetWeenieGeneratorsAsync(enc.WeenieClassId, 1, CancellationToken.None);
+            uint spawnId = generators.Count > 0 ? generators[0].SpawnWeenieClassId : enc.WeenieClassId;
+            var spawnName = generators.Count > 0 ? generators[0].SpawnWeenieName : enc.WeenieName;
+
+            // Step 3 – Setup DID for the spawned mob
+            var setupDid = await connector.GetWeenieSetupDidAsync(spawnId, CancellationToken.None);
+            if (setupDid == 0)
+                setupDid = await connector.GetWeenieSetupDidAsync(enc.WeenieClassId, CancellationToken.None);
+
+            if (setupDid == 0) {
+                _log.LogWarning("[Encounter Spawn] No Setup DID found for weenie {Id} ({Name})", spawnId, spawnName);
+                return;
+            }
+
+            // Step 4 – world position 5 units in front of the camera
+            var worldPos = Camera.Position + Camera.Forward * 5f;
+
+            // Step 5 – landblock + local-space position
+            var region = ActiveDocument.Region;
+            if (region == null) {
+                _log.LogWarning("[Encounter Spawn] Region not loaded");
+                return;
+            }
+            var landblockId = _landscapeObjectService.ComputeLandblockId(region, worldPos);
+            var lbOrigin    = _landscapeObjectService.ComputeWorldPosition(region, landblockId, Vector3.Zero);
+            var localPos    = worldPos - lbOrigin;
+
+            uint? cellId = _gameScene?.GetEnvCellAt(worldPos);
+            if (cellId == 0) cellId = null;
+
+            var objType    = cellId.HasValue ? ObjectType.EnvCellStaticObject : ObjectType.StaticObject;
+            var instanceId = InstanceIdGenerator.GenerateUniqueInstanceId(ActiveDocument, landblockId, cellId, objType);
+            var layerId    = ActiveLayer?.Id ?? ActiveDocument.BaseLayerId ?? "";
+
+            var spawnObj = new StaticObject {
+                ModelId    = setupDid,
+                InstanceId = instanceId,
+                LayerId    = layerId,
+                Position   = localPos,
+                Rotation   = Quaternion.Identity,
+                CellId     = cellId
+            };
+
+            AddStaticObject(layerId, landblockId, spawnObj);
+            _log.LogInformation("[Encounter Spawn] Placed 0x{Setup:X8} ({Name}) at {Pos}", setupDid, spawnName, worldPos);
+        }
+        catch (Exception ex) {
+            _log.LogError(ex, "[Encounter Spawn] Failed");
         }
     }
 
@@ -1049,8 +1295,18 @@ public partial class LandscapeViewModel : ViewModelBase, ILandscapeRaycastServic
     }
 
     public void Dispose() {
+        _encounterTickCts?.Cancel();
+        _encounterTickCts?.Dispose();
+        _encounterTickCts = null;
+        _encounterLoadLock.Dispose();
         _settingsBridge.Dispose();
         CommandHistory.OnChange -= OnCommandHistoryChanged;
         _landscapeRental?.Dispose();
     }
 }
+
+/// <summary>
+/// Lightweight data point for minimap rendering. WorldX/Y are in world-space units.
+/// IsGenerator = true → yellow dot (generator weenie), false → orange dot (spawned mob position).
+/// </summary>
+public record EncounterMapDot(float WorldX, float WorldY, bool IsGenerator, string Name);

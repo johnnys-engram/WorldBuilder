@@ -8,12 +8,14 @@ using HanumanInstitute.MvvmDialogs;
 using HanumanInstitute.MvvmDialogs.FrameworkDialogs;
 using DatReaderWriter.Enums;
 using DatReaderWriter.Types;
+using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.IO;
 using SpellItemType = DatReaderWriter.Enums.ItemType;
 using SpellRow = DatReaderWriter.Types.SpellBase;
 using WorldBuilder.Lib;
 using WorldBuilder.Services;
+using WorldBuilder.Shared.Lib;
 using WorldBuilder.Shared.Models;
 using WorldBuilder.Shared.Services;
 using WorldBuilder.ViewModels;
@@ -32,6 +34,9 @@ public partial class SpellEditorViewModel : ViewModelBase {
     private SpellComponentTable? _componentTable;
     private bool _initialized;
     private const uint SpellTableId = 0x0E00000E;
+    private const int SpellListIconSize = 28;
+    private readonly ConcurrentDictionary<uint, WriteableBitmap?> _spellListIconCache = new();
+    private IReadOnlyDictionary<MagicSchool, uint> _spellSchoolListIcons = new Dictionary<MagicSchool, uint>();
 
     [ObservableProperty] private string _statusText = "Loading spell editor…";
     [ObservableProperty] private string _searchText = "";
@@ -105,6 +110,7 @@ public partial class SpellEditorViewModel : ViewModelBase {
         TotalSpellCount = _allSpells.Count;
         _dats.Portal.TryGet<SpellComponentTable>(0x0E00000F, out var compTable);
         _componentTable = compTable;
+        _spellSchoolListIcons = SpellSchoolListIconMap.ResolveSchoolIcons(_dats);
         ApplyFilter();
         StatusText = $"Loaded {TotalSpellCount} spells (read-only), {_componentTable?.Components.Count ?? 0} components";
     }
@@ -126,6 +132,7 @@ public partial class SpellEditorViewModel : ViewModelBase {
 
         _dats.Portal.TryGet<SpellComponentTable>(0x0E00000F, out var compTable);
         _componentTable = compTable;
+        _spellSchoolListIcons = SpellSchoolListIconMap.ResolveSchoolIcons(_dats);
 
         ApplyFilter();
         StatusText = $"Loaded {TotalSpellCount} spells, {_componentTable?.Components.Count ?? 0} components";
@@ -163,7 +170,7 @@ public partial class SpellEditorViewModel : ViewModelBase {
         bool hasDecimalIdSearch = !hasHexIdSearch && query.Length > 0 && query.All(char.IsDigit)
             && uint.TryParse(query, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out searchId);
 
-        var filtered = _allSpells
+        var ordered = _allSpells
             .Where(kvp => {
                 if (hasHexIdSearch || hasDecimalIdSearch) return kvp.Key == searchId;
                 if (!string.IsNullOrEmpty(query) &&
@@ -174,12 +181,35 @@ public partial class SpellEditorViewModel : ViewModelBase {
                 return true;
             })
             .OrderBy(kvp => kvp.Value.DisplayOrder).ThenBy(kvp => kvp.Key)
-            .Take(500)
-            .Select(kvp => new SpellListItem(kvp.Key, kvp.Value))
             .ToList();
 
-        Spells = new ObservableCollection<SpellListItem>(filtered);
-        FilteredSpellCount = filtered.Count;
+        FilteredSpellCount = ordered.Count;
+        var listItems = ordered.Select(kvp => new SpellListItem(kvp.Key, kvp.Value, _spellSchoolListIcons)).ToList();
+        Spells = new ObservableCollection<SpellListItem>(listItems);
+        ScheduleSpellListIcons(listItems);
+    }
+
+    private void ScheduleSpellListIcons(IReadOnlyList<SpellListItem> items) {
+        if (_dats == null || items.Count == 0) return;
+
+        var iconIds = items.Select(i => i.IconId).Where(id => id != 0).Distinct().ToArray();
+        if (iconIds.Length == 0) return;
+
+        var localDats = _dats;
+        Task.Run(() => {
+            var map = new Dictionary<uint, WriteableBitmap?>(iconIds.Length);
+            foreach (var id in iconIds) {
+                var bmp = _spellListIconCache.GetOrAdd(id, _ => DatIconLoader.LoadIcon(localDats, id, SpellListIconSize));
+                map[id] = bmp;
+            }
+
+            Dispatcher.UIThread.Post(() => {
+                foreach (var item in items) {
+                    if (item.IconId != 0 && map.TryGetValue(item.IconId, out var bmp))
+                        item.ListIcon = bmp;
+                }
+            });
+        });
     }
 
     [RelayCommand]
@@ -241,7 +271,9 @@ public partial class SpellEditorViewModel : ViewModelBase {
             if (Spells[i].Id == id) { idx = i; break; }
         }
         if (idx >= 0) {
-            Spells[idx] = new SpellListItem(id, spell);
+            var updated = new SpellListItem(id, spell, _spellSchoolListIcons);
+            Spells[idx] = updated;
+            ScheduleSpellListIcons(new[] { updated });
         }
 
         StatusText = $"Saved spell #{id}: {spell.Name} to project. Use File → Export Dats for client_portal.dat.";
@@ -362,18 +394,20 @@ public partial class SpellEditorViewModel : ViewModelBase {
     }
 }
 
-public class SpellListItem {
+public partial class SpellListItem : ObservableObject {
     public uint Id { get; }
+    public uint IconId { get; }
     public string Name { get; }
-    public MagicSchool School { get; }
     public SpellType MetaSpellType { get; }
     public uint Power { get; }
     public uint BaseMana { get; }
 
-    public SpellListItem(uint id, SpellRow spell) {
+    [ObservableProperty] private WriteableBitmap? _listIcon;
+
+    public SpellListItem(uint id, SpellRow spell, IReadOnlyDictionary<MagicSchool, uint> schoolIcons) {
         Id = id;
+        IconId = SpellSchoolListIconMap.ListIconId(spell.Icon, spell.School, schoolIcons);
         Name = spell.Name?.ToString() ?? "";
-        School = spell.School;
         MetaSpellType = spell.MetaSpellType;
         Power = spell.Power;
         BaseMana = spell.BaseMana;
@@ -597,8 +631,7 @@ public partial class SpellDetailViewModel : ObservableObject {
                 foreach (var iconId in uniqueIconIds) {
                     var item = new IconPickerItem(iconId);
                     item.Bitmap = DatIconLoader.LoadIcon(localDats, iconId, 32);
-                    if (item.Bitmap != null)
-                        items.Add(item);
+                    items.Add(item);
                 }
                 Dispatcher.UIThread.Post(() => {
                     AvailableIcons = new ObservableCollection<IconPickerItem>(items);

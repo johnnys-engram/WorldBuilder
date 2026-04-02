@@ -29,7 +29,12 @@ namespace Chorizite.OpenGLSDLBackend.Lib {
 
         // Instance readiness coordination (used by SceneryRenderManager)
         private readonly ConcurrentDictionary<ushort, TaskCompletionSource> _instanceReadyTcs = new();
+        private readonly ConcurrentDictionary<ushort, TaskCompletionSource> _gpuReadyTcs = new();
         private readonly object _tcsLock = new();
+
+        // Encounter preview overlay — entries are merged into PendingInstances during every
+        // GenerateForLandblockAsync call, making them permanent and race-free.
+        private readonly ConcurrentDictionary<ushort, List<(ObjectId InstanceId, uint ModelId, Vector3 WorldPos, Quaternion Rotation, float Scale)>> _encounterOverlay = new();
 
         // Visibility filters (Option A: stored as state, used by base PrepareRenderBatches)
         private bool _showBuildings = true;
@@ -42,6 +47,29 @@ namespace Chorizite.OpenGLSDLBackend.Lib {
             : base(gl, graphicsDevice, meshManager, log, landscapeDoc, frustum, true, 4096) {
             _dats = dats;
         }
+
+        #region Public: Encounter Overlay
+
+        /// <summary>
+        /// Stores encounter preview instances for a landblock. On every subsequent
+        /// <see cref="GenerateForLandblockAsync"/> call these are merged into the normal
+        /// instance list so they survive terrain edits and camera-distance regenerations.
+        /// </summary>
+        public void SetEncounterOverlay(ushort lbId, IEnumerable<(ObjectId InstanceId, uint ModelId, Vector3 WorldPos, Quaternion Rotation, float Scale)> entries) {
+            _encounterOverlay[lbId] = new List<(ObjectId, uint, Vector3, Quaternion, float)>(entries);
+        }
+
+        /// <summary>Removes the encounter overlay for a landblock.</summary>
+        public void ClearEncounterOverlay(ushort lbId) {
+            _encounterOverlay.TryRemove(lbId, out _);
+        }
+
+        /// <summary>Removes all encounter overlays.</summary>
+        public void ClearAllEncounterOverlays() {
+            _encounterOverlay.Clear();
+        }
+
+        #endregion
 
         #region Public: Static Object-Specific API
 
@@ -61,6 +89,38 @@ namespace Chorizite.OpenGLSDLBackend.Lib {
                     }
                 }
             }
+        }
+
+        /// <summary>
+        /// Waits until the GPU buffers for a landblock have been committed
+        /// (i.e. <see cref="ObjectLandblock.GpuReady"/> is <c>true</c> and
+        /// <see cref="ObjectLandblock.PendingInstances"/> is <c>null</c>).
+        /// Callers that add temporary preview instances must wait on this rather than
+        /// <see cref="WaitForInstancesAsync"/> to avoid having their additions overwritten
+        /// by the subsequent <c>lb.Instances = lb.PendingInstances</c> commit in
+        /// <c>UploadLandblockMeshes</c>.
+        /// </summary>
+        public async Task WaitForGpuReadyAsync(ushort key, CancellationToken ct = default) {
+            Task task;
+            lock (_tcsLock) {
+                if (_landblocks.TryGetValue(key, out var lb) && lb.GpuReady) return;
+                var tcs = _gpuReadyTcs.GetOrAdd(key, _ => new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously));
+                task = tcs.Task;
+            }
+            using (ct.Register(() => {
+                lock (_tcsLock) {
+                    if (_gpuReadyTcs.TryGetValue(key, out var tcs)) {
+                        tcs.TrySetCanceled();
+                    }
+                }
+            })) {
+                await task;
+            }
+        }
+
+        protected override void OnLandblockUploaded(ushort key) {
+            if (_gpuReadyTcs.TryRemove(key, out var tcs))
+                tcs.TrySetResult();
         }
 
         /// <summary>
@@ -169,7 +229,20 @@ namespace Chorizite.OpenGLSDLBackend.Lib {
         }
 
         public void SubmitDebugShapes(DebugRenderer? debug, DebugRenderSettings settings) {
-            if (debug == null || LandscapeDoc.Region == null || !settings.ShowBoundingBoxes) return;
+            if (debug == null || LandscapeDoc.Region == null) return;
+
+            if (settings.ShowEncounterBeacons) {
+                const float beaconHeight = 180f;
+                var yellow = new Vector4(1f, 1f, 0.15f, 1f);
+                foreach (var (_, entries) in _encounterOverlay) {
+                    foreach (var (_, _, worldPos, _, _) in entries) {
+                        var top = worldPos + new Vector3(0f, 0f, beaconHeight);
+                        debug.DrawLine(worldPos, top, yellow, 4f);
+                    }
+                }
+            }
+
+            if (!settings.ShowBoundingBoxes) return;
 
             foreach (var lb in _landblocks.Values) {
                 if (!lb.InstancesReady || !IsWithinRenderDistance(lb)) continue;
@@ -397,6 +470,34 @@ namespace Chorizite.OpenGLSDLBackend.Lib {
                         LocalBoundingBox = localBbox,
                         BoundingBox = bbox
                     });
+                }
+
+                // Merge encounter overlay — these are temporary/preview instances that survive
+                // all regenerations because they are re-injected here every generation cycle.
+                if (_encounterOverlay.TryGetValue(lbId, out var overlayEntries)) {
+                    var lbOrigin = new Vector3(lbGlobalX * lbSizeUnits + regionInfo.MapOffset.X, lbGlobalY * lbSizeUnits + regionInfo.MapOffset.Y, 0);
+                    foreach (var (instId, modelId, worldPos, rot, scale) in overlayEntries) {
+                        var isSetup = (modelId >> 24) == 0x02;
+                        var scaleVec = new Vector3(scale, scale, scale);
+                        var transform = Matrix4x4.CreateScale(scaleVec)
+                            * Matrix4x4.CreateFromQuaternion(rot)
+                            * Matrix4x4.CreateTranslation(worldPos);
+                        var bounds = MeshManager.GetBounds(modelId, isSetup);
+                        var localBbox = bounds.HasValue ? new BoundingBox(bounds.Value.Min, bounds.Value.Max) : default;
+                        staticObjects.Add(new SceneryInstance {
+                            ObjectId = modelId,
+                            InstanceId = instId,
+                            IsSetup = isSetup,
+                            IsBuilding = false,
+                            WorldPosition = worldPos,
+                            LocalPosition = worldPos - lbOrigin,
+                            Rotation = rot,
+                            Scale = scaleVec,
+                            Transform = transform,
+                            LocalBoundingBox = localBbox,
+                            BoundingBox = localBbox.Transform(transform)
+                        });
+                    }
                 }
 
                 lb.PendingInstances = staticObjects;

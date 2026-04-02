@@ -90,7 +90,20 @@ public static class DatIconLoader {
         if (rgba == null) return null;
         if (w != size || h != size)
             rgba = DownsampleNearest(rgba, w, h, size, size);
+        KeyNearBlackToTransparent(rgba, size * size);
         return CreateBitmap(rgba, size, size);
+    }
+
+    /// <summary>
+    /// UI icons often use solid black as empty space; make it transparent so panels/buttons show through.
+    /// </summary>
+    private static void KeyNearBlackToTransparent(byte[] rgba, int pixelCount) {
+        const byte threshold = 8;
+        for (int i = 0; i < pixelCount; i++) {
+            int o = i * 4;
+            if (rgba[o] <= threshold && rgba[o + 1] <= threshold && rgba[o + 2] <= threshold)
+                rgba[o + 3] = 0;
+        }
     }
 
     internal static WriteableBitmap CreateBitmap(byte[] rgba, int width, int height) {
