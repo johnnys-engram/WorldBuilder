@@ -85,15 +85,13 @@ public partial class ExperienceEditorViewModel : ViewModelBase {
         _dialogService = dialogService;
     }
 
-    public bool CanExportExperienceSectionCsv => _table != null
+    public bool CanExportAllExperienceSectionsCsv => _table != null;
+
+    public bool CanImportExperienceSectionCsv =>
+        IsExperienceEditingEnabled && _table != null
         && ExperienceSectionCsvSerializer.TryGetSection(SelectedTabIndex, out _);
 
-    public bool CanImportExperienceSectionCsv => IsExperienceEditingEnabled && CanExportExperienceSectionCsv;
-
-    partial void OnSelectedTabIndexChanged(int value) {
-        OnPropertyChanged(nameof(CanExportExperienceSectionCsv));
-        OnPropertyChanged(nameof(CanImportExperienceSectionCsv));
-    }
+    partial void OnSelectedTabIndexChanged(int value) => OnPropertyChanged(nameof(CanImportExperienceSectionCsv));
 
     partial void OnIsExperienceEditingEnabledChanged(bool value) => OnPropertyChanged(nameof(CanImportExperienceSectionCsv));
 
@@ -131,7 +129,7 @@ public partial class ExperienceEditorViewModel : ViewModelBase {
 
         _table = datTable;
         PopulateCollections();
-        OnPropertyChanged(nameof(CanExportExperienceSectionCsv));
+        OnPropertyChanged(nameof(CanExportAllExperienceSectionsCsv));
         OnPropertyChanged(nameof(CanImportExperienceSectionCsv));
         StatusText = $"Loaded (read-only): {_table.Levels.Length} levels, {_table.Attributes.Length} attribute ranks, " +
                      $"{_table.Vitals.Length} vital ranks, {_table.TrainedSkills.Length} trained, " +
@@ -151,7 +149,7 @@ public partial class ExperienceEditorViewModel : ViewModelBase {
         }
 
         PopulateCollections();
-        OnPropertyChanged(nameof(CanExportExperienceSectionCsv));
+        OnPropertyChanged(nameof(CanExportAllExperienceSectionsCsv));
         OnPropertyChanged(nameof(CanImportExperienceSectionCsv));
         StatusText = $"Loaded: {_table.Levels.Length} levels, {_table.Attributes.Length} attribute ranks, " +
                      $"{_table.Vitals.Length} vital ranks, {_table.TrainedSkills.Length} trained, " +
@@ -405,42 +403,44 @@ public partial class ExperienceEditorViewModel : ViewModelBase {
     }
 
     [RelayCommand]
-    private async Task ExportExperienceSectionCsvAsync(CancellationToken ct) {
-        if (_table == null || !ExperienceSectionCsvSerializer.TryGetSection(SelectedTabIndex, out var section))
-            return;
+    private async Task ExportAllExperienceSectionsCsvAsync(CancellationToken ct) {
+        if (_table == null) return;
 
-        var suggestedDir = GetSuggestedDocumentsDirectory();
-        var stem = ExperienceSectionCsvSerializer.SectionFileStem(section);
+        var suggestedDir = GetExperienceImportSuggestedDirectory();
+        if (string.IsNullOrWhiteSpace(suggestedDir) || !Directory.Exists(suggestedDir))
+            suggestedDir = GetSuggestedDocumentsDirectory();
 
-        var file = await TopLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions {
-            Title = $"Export {ExperienceSectionCsvSerializer.SectionDisplayName(section)} (CSV)",
-            DefaultExtension = "csv",
-            SuggestedFileName = $"{stem}.csv",
+        var folders = await TopLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions {
+            Title = "Export all experience sections — choose folder for CSV files",
+            AllowMultiple = false,
             SuggestedStartLocation = await TopLevel.StorageProvider.TryGetFolderFromPathAsync(suggestedDir),
-            FileTypeChoices = new[] {
-                new FilePickerFileType("Experience table CSV") { Patterns = new[] { "*.csv" } },
-            },
         });
 
-        if (file == null) return;
+        if (folders.Count == 0) return;
 
-        var path = file.TryGetLocalPath();
-        if (string.IsNullOrWhiteSpace(path)) {
-            await _dialogService.ShowMessageBoxAsync(null, "Could not resolve a local path for that file.", "Export failed");
+        var dir = folders[0].TryGetLocalPath();
+        if (string.IsNullOrWhiteSpace(dir)) {
+            await _dialogService.ShowMessageBoxAsync(null, "Could not resolve a local path for that folder.", "Export failed");
             return;
         }
 
         try {
-            var text = section switch {
-                ExperienceCsvSection.Levels => ExperienceSectionCsvSerializer.SerializeLevels(Levels),
-                ExperienceCsvSection.Attributes => ExperienceSectionCsvSerializer.SerializeRankSection(Attributes),
-                ExperienceCsvSection.Vitals => ExperienceSectionCsvSerializer.SerializeRankSection(Vitals),
-                ExperienceCsvSection.TrainedSkills => ExperienceSectionCsvSerializer.SerializeRankSection(TrainedSkills),
-                ExperienceCsvSection.SpecializedSkills => ExperienceSectionCsvSerializer.SerializeRankSection(SpecializedSkills),
-                _ => throw new InvalidOperationException("Unknown section."),
-            };
-            await File.WriteAllTextAsync(path, text, ct);
-            StatusText = $"Exported {ExperienceSectionCsvSerializer.SectionDisplayName(section)} to {Path.GetFileName(path)}.";
+            foreach (ExperienceCsvSection section in Enum.GetValues<ExperienceCsvSection>()) {
+                var stem = ExperienceSectionCsvSerializer.SectionFileStem(section);
+                var path = Path.Combine(dir, $"{stem}.csv");
+                var text = section switch {
+                    ExperienceCsvSection.Levels => ExperienceSectionCsvSerializer.SerializeLevels(Levels),
+                    ExperienceCsvSection.Attributes => ExperienceSectionCsvSerializer.SerializeRankSection(Attributes),
+                    ExperienceCsvSection.Vitals => ExperienceSectionCsvSerializer.SerializeRankSection(Vitals),
+                    ExperienceCsvSection.TrainedSkills => ExperienceSectionCsvSerializer.SerializeRankSection(TrainedSkills),
+                    ExperienceCsvSection.SpecializedSkills => ExperienceSectionCsvSerializer.SerializeRankSection(SpecializedSkills),
+                    _ => throw new InvalidOperationException("Unknown section."),
+                };
+                await File.WriteAllTextAsync(path, text, ct);
+            }
+
+            RememberExperienceImportDirectory(Path.Combine(dir, "experience-levels.csv"));
+            StatusText = $"Exported all 5 experience sections to {dir}";
         }
         catch (Exception ex) {
             await _dialogService.ShowMessageBoxAsync(null, ex.Message, "Export failed");
